@@ -30,19 +30,19 @@ COPY package-lock.json* ./
 # Smart dependency resolution
 RUN echo "🔍 Analyzing dependency state..." && \
     if [ -f package-lock.json ]; then \
-        echo "📋 Found existing package-lock.json" && \
-        npm ls --depth=0 2>/dev/null || echo "⚠️  Some dependency issues detected" && \
-        if npm ci --dry-run --legacy-peer-deps 2>/dev/null; then \
-            echo "✅ Using existing package-lock.json" && \
-            npm ci --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
-        else \
-            echo "🔄 Regenerating package-lock.json due to sync issues" && \
-            rm -f package-lock.json && \
-            npm install --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
-        fi; \
+    echo "📋 Found existing package-lock.json" && \
+    npm ls --depth=0 2>/dev/null || echo "⚠️  Some dependency issues detected" && \
+    if npm ci --dry-run --legacy-peer-deps 2>/dev/null; then \
+    echo "✅ Using existing package-lock.json" && \
+    npm ci --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
     else \
-        echo "📝 Creating new package-lock.json" && \
-        npm install --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
+    echo "🔄 Regenerating package-lock.json due to sync issues" && \
+    rm -f package-lock.json && \
+    npm install --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
+    fi; \
+    else \
+    echo "📝 Creating new package-lock.json" && \
+    npm install --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
     fi && \
     echo "✅ Dependencies installed successfully"
 
@@ -90,8 +90,8 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
 
 # Initialize shadcn/ui components with error handling
 RUN npx --yes shadcn@2.5.0 init --yes 2>/dev/null || { \
-        echo "shadcn init failed, continuing without it..."; \
-        true; \
+    echo "shadcn init failed, continuing without it..."; \
+    true; \
     }
 
 RUN npx --yes shadcn@2.5.0 add \
@@ -102,15 +102,15 @@ RUN npx --yes shadcn@2.5.0 add \
     progress radio-group resizable scroll-area select separator sheet \
     skeleton slider sonner switch table tabs textarea toast toggle \
     toggle-group tooltip --yes 2>/dev/null || { \
-        echo "Some shadcn components failed to install, continuing..."; \
-        true; \
+    echo "Some shadcn components failed to install, continuing..."; \
+    true; \
     }
 
 # Generate Prisma client (safe without database connection)
 RUN if [ -f prisma/schema.prisma ]; then \
-        npx prisma generate; \
+    npx prisma generate; \
     else \
-        echo "No Prisma schema found, skipping generation..."; \
+    echo "No Prisma schema found, skipping generation..."; \
     fi
 
 # Build the Next.js application
@@ -166,4 +166,4 @@ USER nextjs
 EXPOSE 3000
 
 # Use startup script as entrypoint
-CMD ["./startup.sh"]
+CMD ["./entrypoint.sh"]
