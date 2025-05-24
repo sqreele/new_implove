@@ -151,10 +151,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Copy entrypoint script
-COPY --chown=nextjs:nodejs entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh
-
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/.next/cache && \
     mkdir -p ./prisma && \
@@ -170,5 +166,5 @@ USER nextjs
 # Expose port
 EXPOSE 3000
 
-# Use entrypoint script
-CMD ["./entrypoint.sh"]
+# Start the application directly with Next.js
+CMD ["npx", "next", "start"]
