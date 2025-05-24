@@ -151,9 +151,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Copy startup script
-COPY --chown=nextjs:nodejs startup.sh ./startup.sh
-RUN chmod +x ./startup.sh
+# Copy entrypoint script
+COPY --chown=nextjs:nodejs entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/.next/cache && \
@@ -170,5 +170,5 @@ USER nextjs
 # Expose port
 EXPOSE 3000
 
-# Use startup script as entrypoint
+# Use entrypoint script
 CMD ["./entrypoint.sh"]

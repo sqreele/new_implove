@@ -159,10 +159,13 @@ main() {
     echo "🌐 Application will be available on port ${PORT:-3000}"
     
     # Start the Next.js application
-    # Check if we have a standalone build
+    # Check if we have a standalone build (this should exist now)
     if [ -f "./server.js" ]; then
         echo "🚀 Starting standalone server..."
         exec node server.js
+    elif [ -f "./node_modules/.bin/next" ]; then
+        echo "🚀 Starting with Next.js CLI..."
+        exec ./node_modules/.bin/next start
     else
         echo "🚀 Starting with npm..."
         exec npm start
