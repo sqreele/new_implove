@@ -116,6 +116,19 @@ RUN if [ -f prisma/schema.prisma ]; then \
 # Build the Next.js application
 RUN npm run build
 
+# Debug: Check what was actually built
+RUN echo "=== BUILD OUTPUT DEBUG ===" && \
+    echo "Contents of /app/.next:" && \
+    ls -la /app/.next/ && \
+    echo "Checking for standalone build:" && \
+    if [ -d "/app/.next/standalone" ]; then \
+    echo "✅ Standalone build found" && \
+    ls -la /app/.next/standalone/; \
+    else \
+    echo "❌ No standalone build found"; \
+    fi && \
+    echo "=== END DEBUG ==="
+
 # Clean up dev dependencies and build artifacts to reduce image size
 RUN npm ci --omit=dev --legacy-peer-deps && \
     npm cache clean --force && \
@@ -132,18 +145,21 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME="0.0.0.0"
 
-# Copy built application from builder stage
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copy package.json and node_modules for regular Next.js operation
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+
+# Copy the built Next.js application
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Copy package.json for dependency information
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
+# Try to copy standalone build if it exists (will be ignored if not found)
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./ 2>/dev/null || echo "No standalone build, using regular build"
 
 # Copy Prisma files if they exist
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma/ 2>/dev/null || echo "No Prisma files found, skipping..."
 
-# Copy Next.js config files if they exist
+# Copy Next.js config files if they exist  
 COPY --from=builder --chown=nextjs:nodejs /app/next.config.* ./ 2>/dev/null || true
 COPY --from=builder --chown=nextjs:nodejs /app/components.json ./ 2>/dev/null || true
 
