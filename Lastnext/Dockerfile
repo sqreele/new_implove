@@ -8,6 +8,7 @@ RUN npm install -g npm@11.4.1
 RUN apk add --no-cache \
     libc6-compat \
     curl \
+    postgresql-client \
     && rm -rf /var/cache/apk/*
 
 # Set working directory
@@ -25,11 +26,6 @@ FROM base AS deps
 # Copy package files
 COPY package.json ./
 COPY package-lock.json* ./
-
-# Always regenerate lock file to ensure compatibility
-RUN echo "Regenerating package-lock.json to ensure compatibility..." && \
-    rm -f package-lock.json && \
-    npm install --package-lock-only --legacy-peer-deps
 
 # Install all dependencies (including dev dependencies needed for build)
 RUN npm ci \
@@ -81,7 +77,7 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
 # Initialize shadcn/ui components with error handling
 RUN npx --yes shadcn@2.5.0 init --yes 2>/dev/null || { \
         echo "shadcn init failed, continuing without it..."; \
-        exit 0; \
+        true; \
     }
 
 RUN npx --yes shadcn@2.5.0 add \
@@ -93,7 +89,7 @@ RUN npx --yes shadcn@2.5.0 add \
     skeleton slider sonner switch table tabs textarea toast toggle \
     toggle-group tooltip --yes 2>/dev/null || { \
         echo "Some shadcn components failed to install, continuing..."; \
-        exit 0; \
+        true; \
     }
 
 # Generate Prisma client (safe without database connection)
@@ -122,29 +118,31 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME="0.0.0.0"
 
-# Copy all files from builder, then clean up what we don't need
-COPY --from=builder --chown=nextjs:nodejs /app ./temp_copy
-RUN cp -r ./temp_copy/.next ./ && \
-    cp -r ./temp_copy/public ./ && \
-    cp -r ./temp_copy/node_modules ./ && \
-    cp ./temp_copy/package.json ./ && \
-    cp ./temp_copy/package-lock.json ./ && \
-    if [ -f ./temp_copy/next.config.js ]; then cp ./temp_copy/next.config.js ./; fi && \
-    if [ -f ./temp_copy/next.config.mjs ]; then cp ./temp_copy/next.config.mjs ./; fi && \
-    if [ -f ./temp_copy/next.config.ts ]; then cp ./temp_copy/next.config.ts ./; fi && \
-    if [ -f ./temp_copy/components.json ]; then cp ./temp_copy/components.json ./; fi && \
-    rm -rf ./temp_copy
+# Copy built application from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Copy package.json for dependency information
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
 
 # Copy Prisma files if they exist
-RUN mkdir -p ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma/ || echo "No Prisma files found, skipping..."
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma/ 2>/dev/null || echo "No Prisma files found, skipping..."
+
+# Copy Next.js config files if they exist
+COPY --from=builder --chown=nextjs:nodejs /app/next.config.* ./ 2>/dev/null || true
+COPY --from=builder --chown=nextjs:nodejs /app/components.json ./ 2>/dev/null || true
+
+# Copy startup script
+COPY --chown=nextjs:nodejs startup.sh ./startup.sh
+RUN chmod +x ./startup.sh
 
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/.next/cache && \
     chown -R nextjs:nodejs /app
 
 # Add health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Switch to non-root user for security
@@ -153,5 +151,5 @@ USER nextjs
 # Expose port
 EXPOSE 3000
 
-# Start the application with proper signal handling
-CMD ["npm", "start"]
+# Use startup script as entrypoint
+CMD ["./startup.sh"]
