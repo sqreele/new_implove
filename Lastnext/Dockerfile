@@ -26,18 +26,10 @@ FROM base AS deps
 COPY package.json ./
 COPY package-lock.json* ./
 
-# Validate and fix package-lock.json if needed
-RUN if [ -f package-lock.json ]; then \
-        echo "Validating package-lock.json..."; \
-        npm ci --dry-run --legacy-peer-deps || { \
-            echo "Lock file is out of sync, regenerating..."; \
-            rm package-lock.json; \
-            npm install --package-lock-only --legacy-peer-deps; \
-        }; \
-    else \
-        echo "No lock file found, generating..."; \
-        npm install --package-lock-only --legacy-peer-deps; \
-    fi
+# Always regenerate lock file to ensure compatibility
+RUN echo "Regenerating package-lock.json to ensure compatibility..." && \
+    rm -f package-lock.json && \
+    npm install --package-lock-only --legacy-peer-deps
 
 # Install all dependencies (including dev dependencies needed for build)
 RUN npm ci \
