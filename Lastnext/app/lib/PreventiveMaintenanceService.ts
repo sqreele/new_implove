@@ -375,7 +375,7 @@ class PreventiveMaintenanceService {
     }
   }
 
-  // Updated delete method to use enhanced authentication
+  // Updated delete method to use Next.js API route instead of direct Django call
   async deletePreventiveMaintenance(id: string): Promise<ServiceResponse<null>> {
     if (!id) {
       console.error('Cannot delete: PM ID is undefined or empty');
@@ -385,21 +385,14 @@ class PreventiveMaintenanceService {
     try {
       console.log(`Attempting to delete preventive maintenance with ID: ${id}`);
       
-      // Import the enhanced auth helper
-      const { makeAuthenticatedRequest, getCurrentSession } = await import('./auth-helpers');
-      
-      // Check if user is authenticated first
-      const session = await getCurrentSession();
-      if (!session) {
-        return { 
-          success: false, 
-          message: 'You must be logged in to delete maintenance records.' 
-        };
-      }
-
-      // Use our Next.js API route for deletion with authentication
-      const response = await makeAuthenticatedRequest(`${this.baseUrl}/${id}/`, {
+      // Use fetch directly to call our Next.js API route instead of apiClient
+      const response = await fetch(`${this.baseUrl}/${id}/`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Include credentials to ensure session is sent
+        credentials: 'include',
       });
 
       if (response.status === 403) {
@@ -438,14 +431,6 @@ class PreventiveMaintenanceService {
         return { 
           success: false, 
           message: 'Network error. Please check your connection and try again.' 
-        };
-      }
-      
-      // Handle authentication errors
-      if (error.message.includes('authentication')) {
-        return { 
-          success: false, 
-          message: 'Authentication failed. Please log in again.' 
         };
       }
       
