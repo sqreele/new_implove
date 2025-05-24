@@ -153,18 +153,16 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Try to copy standalone build if it exists (will be ignored if not found)
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./ 2>/dev/null || echo "No standalone build, using regular build"
-
 # Copy Prisma files if they exist
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma/ 2>/dev/null || echo "No Prisma files found, skipping..."
+RUN mkdir -p ./prisma
+COPY --from=builder /app/prisma ./prisma/ 2>/dev/null || true
 
 # Copy Next.js config files if they exist  
-COPY --from=builder --chown=nextjs:nodejs /app/next.config.* ./ 2>/dev/null || true
-COPY --from=builder --chown=nextjs:nodejs /app/components.json ./ 2>/dev/null || true
+COPY --from=builder /app/next.config.* ./ 2>/dev/null || true
+COPY --from=builder /app/components.json ./ 2>/dev/null || true
 
 # Copy startup script
-COPY --chown=nextjs:nodejs startup.sh ./startup.sh
+COPY startup.sh ./startup.sh
 RUN chmod +x ./startup.sh
 
 # Create necessary directories with proper permissions
