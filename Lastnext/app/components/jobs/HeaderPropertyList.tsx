@@ -6,12 +6,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+} from "@/app/components/ui/dropdown-menu";
+import { Button } from "@/app/components/ui/button";
 import { ChevronDown, Building2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/app/lib/utils";
 import { Loader2 } from "lucide-react";
-import { useUser } from '@/lib/user-context';
+import { useUser } from '@/app/lib/user-context';
 
 const HeaderPropertyList = () => {
   const { userProfile, selectedProperty, setSelectedProperty, loading } = useUser();

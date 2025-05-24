@@ -1,24 +1,24 @@
 import React, { useState } from "react";
 import { Search, Filter, X, Calendar, CalendarIcon, Check, Wrench } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/app/components/ui/select";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import { JobStatus, JobPriority } from "@/lib/types";
-import { cn } from "@/lib/utils";
+} from "@/app/components/ui/popover";
+import { Badge } from "@/app/components/ui/badge";
+import { JobStatus, JobPriority } from "@/app/lib/types";
+import { cn } from "@/app/lib/utils";
 import { format } from "date-fns";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Calendar as CalendarComponent } from "@/app/components/ui/calendar";
 
 export interface FilterState {
   search: string;

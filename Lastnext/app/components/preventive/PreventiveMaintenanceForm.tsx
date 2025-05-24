@@ -12,15 +12,15 @@ import {
   ServiceResponse,
   getPropertyDetails,
   MachineDetails, // Import MachineDetails
-} from '@/lib/preventiveMaintenanceModels';
-import apiClient from '@/lib/api-client';
-import FileUpload from '@/components/jobs/FileUpload';
-import { useToast } from '@/lib/hooks/use-toast';
-import { useProperty } from '@/lib/PropertyContext';
+} from '@/app/lib/preventiveMaintenanceModels';
+import apiClient from '@/app/lib/api-client';
+import FileUpload from '@/app/components/jobs/FileUpload';
+import { useToast } from '@/app/lib/hooks/use-toast';
+import { useProperty } from '@/app/lib/PropertyContext';
 import preventiveMaintenanceService, {
   type CreatePreventiveMaintenanceData,
   type UpdatePreventiveMaintenanceData,
-} from '@/lib/PreventiveMaintenanceService';
+} from '@/app/lib/PreventiveMaintenanceService';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 interface PreventiveMaintenanceFormProps {

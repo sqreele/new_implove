@@ -1,38 +1,28 @@
-# Use Node.js version compatible with npm@11.2.0
+# Use a Node.js version compatible with npm@11.2.0
 FROM node:20.17.0-alpine AS base
 RUN npm install -g npm@11.2.0
-RUN npm config set legacy-peer-deps true
 
-# Install dependencies only when needed
+# Dependencies stage
 FROM base AS deps
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
-
-# Copy package files
 COPY package.json package-lock.json* ./
+RUN npm ci --legacy-peer-deps
 
-# Clean install to fix SWC and dependency issues
-RUN rm -f package-lock.json
-RUN npm install
-
-# Rebuild the source code only when needed
+# Builder stage
 FROM base AS builder
 WORKDIR /app
-RUN apk add --no-cache openssl
-
-# Copy dependencies and source
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Add shadcn/ui components before building
-RUN npx shadcn-ui@latest add card --yes
-RUN npx shadcn-ui@latest add button --yes
-RUN npx shadcn-ui@latest add badge --yes
+# Initialize shadcn with pinned version for reproducible builds
+RUN npx shadcn@0.9.5 init --yes
+RUN npx shadcn@0.9.5 add accordion alert alert-dialog avatar badge breadcrumb button calendar card carousel checkbox collapsible command context-menu data-table date-picker dialog drawer dropdown-menu form hover-card input input-otp label menubar navigation-menu pagination popover progress radio-group resizable scroll-area select separator sheet skeleton slider sonner switch table tabs textarea toast toggle toggle-group tooltip --yes
 
-# Generate Prisma client
+# Generate Prisma client (without database connection)
 RUN npx prisma generate
 
-# Set build-time environment variables
+# Build arguments
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PRIVATE_API_URL
 ARG API_URL
@@ -43,6 +33,7 @@ ARG GOOGLE_CLIENT_ID
 ARG GOOGLE_CLIENT_SECRET
 ARG DATABASE_URL
 
+# Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production \
     NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://pmcs.site} \
@@ -53,45 +44,35 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     JWT_SECRET=${JWT_SECRET} \
     GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID} \
     GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET} \
-    DATABASE_URL=${DATABASE_URL}
+    DATABASE_URL=${DATABASE_URL:-postgresql://mylubd_user:Sqreele1234@db:5432/mylubd_db?schema=public} \
+    SKIP_ENV_VALIDATION=true
 
-# Build the application
 RUN npm run build
 
-# Production image
+# Runner stage
 FROM base AS runner
 WORKDIR /app
-RUN apk add --no-cache openssl
 
-ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000 \
-    HOSTNAME="0.0.0.0"
+# Create user
+RUN addgroup --system --gid 999 nodejs && \
+    adduser --system --uid 999 --ingroup nodejs nextjs
 
-# Create nextjs user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy necessary files
+# Copy built application
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/components.json* ./
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# Copy Prisma files for runtime
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+# Create necessary directories and set permissions
+RUN mkdir -p /app/.npm && chown -R nextjs:nodejs /app
 
-# Set runtime environment variables
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://pmcs.site} \
-    NEXT_PRIVATE_API_URL=${NEXT_PRIVATE_API_URL:-http://django-backend:8000} \
-    API_URL=${API_URL:-http://django-backend:8000} \
-    NEXTAUTH_URL=${NEXTAUTH_URL:-https://pmcs.site} \
-    NEXTAUTH_SECRET=${NEXTAUTH_SECRET} \
-    JWT_SECRET=${JWT_SECRET} \
-    GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID} \
-    GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET} \
-    DATABASE_URL=${DATABASE_URL}
+# Runtime environment variables
+ENV PORT=3000 \
+    NODE_ENV=production \
+    HOSTNAME="0.0.0.0"
 
 USER nextjs
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["npm", "start"]

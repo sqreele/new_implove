@@ -2,8 +2,8 @@
 
 import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/app/components/ui/button";
+import { cn } from "@/app/lib/utils";
 
 // Precise type definitions for calendar modes
 type SingleMode = {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { TopicFromAPI } from '@/lib/types';
+import { TopicFromAPI } from '@/app/lib/types';
 
 interface TopicAutocompleteProps {
   topics: TopicFromAPI[];

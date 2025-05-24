@@ -6,7 +6,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@/app/components/ui/card";
 import {
   PieChart,
   Pie,
@@ -21,15 +21,14 @@ import {
   CartesianGrid,
 } from "recharts";
 import _ from "lodash";
-import { Job, JobStatus, STATUS_COLORS } from "@/lib/types";
-import { useProperty } from "@/lib/PropertyContext";
+import { Job, JobStatus, STATUS_COLORS } from "@/app/lib/types";
+import { useProperty } from "@/app/lib/PropertyContext";
 import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
-import { fetchJobs } from "@/lib/data";
-import { Button } from "@/components/ui/button";
+import { fetchJobs } from "@/app/lib/data";
+import { Button } from "@/app/components/ui/button";
 import Link from "next/link";
-import { useJob } from "@/lib/JobContext";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { useJob } from "@/app/lib/JobContext";
 
 interface PropertyJobsDashboardProps {
   initialJobs?: Job[];
@@ -47,58 +46,30 @@ const PropertyJobsDashboard = ({ initialJobs = [] }: PropertyJobsDashboardProps)
   const [filteredJobs, setFilteredJobs] = useState<Job[]>(initialJobs);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
 
   // Memoize the current property ID to reduce unnecessary re-renders
   const effectiveProperty = useMemo(() => {
     return selectedProperty || (userProperties.length > 0 ? userProperties[0].property_id : null);
   }, [selectedProperty, userProperties]);
 
-  // Enhanced authentication error handler
-  const handleAuthError = (errorMessage: string) => {
-    setAuthError(errorMessage);
-    setError(null);
-    
-    // Auto sign out after showing error message
-    if (errorMessage.includes('session has expired') || errorMessage.includes('log in again')) {
-      setTimeout(() => {
-        signOut({ callbackUrl: '/auth/signin' });
-      }, 3000);
-    }
-  };
-
-  // Simplified session refresh with better error handling
-  const refreshSession = async (): Promise<boolean> => {
+  // Simplified session refresh
+  const refreshSession = async () => {
     try {
-      const updatedSession = await update();
-      if (!updatedSession?.user?.accessToken) {
-        handleAuthError("Session refresh failed. Please log in again.");
-        return false;
-      }
+      await update();
       return true;
     } catch (err) {
-      console.error("Session refresh error:", err);
-      handleAuthError("Session expired. Please log in again.");
+      setError("Session expired. Please log in again.");
+      signOut();
       return false;
     }
   };
 
-  // Enhanced authentication check
-  const isAuthenticated = (): boolean => {
-    return status === "authenticated" && !!session?.user?.accessToken;
-  };
-
-  // Load jobs with enhanced error handling and authentication checks
-  const loadJobs = async (isRetry: boolean = false) => {
-    if (!isAuthenticated()) {
-      setError("You need to be logged in to view job statistics.");
-      return;
-    }
+  // Load jobs with optimized error handling
+  const loadJobs = async () => {
+    if (status !== "authenticated" || !session?.user) return;
 
     setIsLoading(true);
     setError(null);
-    setAuthError(null);
 
     try {
       const jobsData = await fetchJobs();
@@ -107,8 +78,8 @@ const PropertyJobsDashboard = ({ initialJobs = [] }: PropertyJobsDashboardProps)
         throw new Error("Invalid jobs data format");
       }
 
-      const currentUserId = session?.user?.id;
-      const currentUsername = session?.user?.username;
+      const currentUserId = session.user.id;
+      const currentUsername = session.user.username;
 
       // Filter only once using simple conditions
       const userJobs = jobsData.filter((job) => {
@@ -117,55 +88,25 @@ const PropertyJobsDashboard = ({ initialJobs = [] }: PropertyJobsDashboardProps)
       });
 
       setAllJobs(userJobs);
-      setRetryCount(0); // Reset retry count on success
     } catch (err) {
-      console.error("Error loading jobs:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch jobs";
-      
-      // Check for authentication errors
-      if (errorMessage.includes("401") || 
-          errorMessage.includes("Unauthorized") || 
-          errorMessage.includes("Authentication") ||
-          errorMessage.includes("Token")) {
-        
-        if (!isRetry && retryCount < 2) {
-          // Try to refresh session first
-          const refreshed = await refreshSession();
-          if (refreshed) {
-            setRetryCount(prev => prev + 1);
-            await loadJobs(true); // Retry with refreshed session
-            return;
-          }
-        }
-        
-        handleAuthError("Your session has expired. Please log in again to view job statistics.");
-      } else if (errorMessage.includes("403") || errorMessage.includes("Forbidden")) {
-        setError("You don't have permission to view job statistics. Please contact your administrator.");
-      } else if (errorMessage.includes("404") || errorMessage.includes("Not Found")) {
-        setError("Job data not found. Please try again later.");
-      } else if (errorMessage.includes("500") || errorMessage.includes("Server Error")) {
-        setError("Server error occurred. Please try again later.");
-      } else {
-        setError(errorMessage);
-      }
-      
+      setError(errorMessage);
       setAllJobs([]);
+
+      if (errorMessage.includes("401") || errorMessage.includes("Unauthorized")) {
+        const refreshed = await refreshSession();
+        if (refreshed) {
+          await loadJobs();
+        }
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Manual retry function
-  const handleRetry = () => {
-    setRetryCount(0);
-    loadJobs();
-  };
-
   // Load jobs when necessary
   useEffect(() => {
-    if (status === "authenticated") {
-      loadJobs();
-    }
+    loadJobs();
   }, [status, jobCreationCount]);
 
   // Filter jobs by property with optimized logic
@@ -300,11 +241,8 @@ const PropertyJobsDashboard = ({ initialJobs = [] }: PropertyJobsDashboardProps)
   if (status === "loading" || isLoading) {
     return (
       <Card className="w-full p-4">
-        <CardContent className="text-center space-y-4">
-          <div className="flex items-center justify-center space-x-2">
-            <RefreshCw className="h-5 w-5 animate-spin text-blue-500" />
-            <p className="text-gray-600 text-base">Loading charts...</p>
-          </div>
+        <CardContent className="text-center">
+          <p className="text-gray-600 text-base">Loading charts...</p>
         </CardContent>
       </Card>
     );
@@ -315,10 +253,7 @@ const PropertyJobsDashboard = ({ initialJobs = [] }: PropertyJobsDashboardProps)
     return (
       <Card className="w-full p-4 bg-yellow-50 border border-yellow-200 rounded-md">
         <CardContent className="text-center space-y-4">
-          <div className="flex items-center justify-center space-x-2">
-            <AlertCircle className="h-5 w-5 text-yellow-600" />
-            <p className="text-yellow-600 text-base">Please log in to view job statistics.</p>
-          </div>
+          <p className="text-yellow-600 text-base">Please log in to view job statistics.</p>
           <Button asChild variant="outline" className="w-full h-12 text-base">
             <Link href="/auth/signin">Log In</Link>
           </Button>
@@ -327,46 +262,15 @@ const PropertyJobsDashboard = ({ initialJobs = [] }: PropertyJobsDashboardProps)
     );
   }
 
-  // Authentication error state
-  if (authError) {
-    return (
-      <Card className="w-full p-4 bg-red-50 border border-red-200 rounded-md">
-        <CardContent className="text-center space-y-4">
-          <div className="flex items-center justify-center space-x-2">
-            <AlertCircle className="h-5 w-5 text-red-600" />
-            <div className="flex-1">
-              <p className="text-red-600 text-base">{authError}</p>
-              {authError.includes('session has expired') && (
-                <p className="text-sm mt-1 text-red-500">You will be redirected to the login page in a few seconds...</p>
-              )}
-            </div>
-          </div>
-          <Button asChild variant="outline" className="w-full h-12 text-base">
-            <Link href="/auth/signin">Log In Again</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // General error state with retry option
+  // Error state
   if (error) {
     return (
-      <Card className="w-full p-4 bg-red-50 border border-red-200 rounded-md">
+      <Card className="w-full p-4 bg-red-50 border border-yellow-200 rounded-md">
         <CardContent className="text-center space-y-4">
-          <div className="flex items-center justify-center space-x-2">
-            <AlertCircle className="h-5 w-5 text-red-600" />
-            <p className="text-red-600 text-base">{error}</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={handleRetry} variant="outline" className="flex-1 h-12 text-base">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-            <Button asChild variant="outline" className="flex-1 h-12 text-base">
-              <Link href="/dashboard/myJobs">Go to My Jobs</Link>
-            </Button>
-          </div>
+          <p className="text-red-600 text-base">{error}</p>
+          <Button asChild variant="outline" className="w-full h-12 text-base">
+            <Link href="/dashboard/myJobs">Go to My Jobs</Link>
+          </Button>
         </CardContent>
       </Card>
     );

@@ -132,16 +132,6 @@ class PreventiveMaintenanceService {
       return { success: true, data: actualRecord, message: 'Maintenance created successfully' };
     } catch (error: any) {
       console.error('Service error creating maintenance:', error);
-      
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed when creating maintenance. User may need to log in again.');
-        return { 
-          success: false, 
-          message: 'You don\'t have permission to create this record or your session has expired. Please log in again.' 
-        };
-      }
-      
       throw handleApiError(error);
     }
   }
@@ -189,16 +179,6 @@ class PreventiveMaintenanceService {
       return { success: true, data: null, message: 'Images uploaded successfully' };
     } catch (error: any) {
       console.error(`Service error uploading images for PM ${pmId}:`, error);
-      
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed when uploading images. User may need to log in again.');
-        return { 
-          success: false, 
-          message: 'You don\'t have permission to upload images or your session has expired. Please log in again.' 
-        };
-      }
-      
       throw handleApiError(error);
     }
   }
@@ -280,16 +260,6 @@ class PreventiveMaintenanceService {
       return { success: true, data: response.data, message: 'Maintenance updated successfully' };
     } catch (error: any) {
       console.error('Service error updating maintenance:', error);
-      
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed when updating maintenance. User may need to log in again.');
-        return { 
-          success: false, 
-          message: 'You don\'t have permission to update this record or your session has expired. Please log in again.' 
-        };
-      }
-      
       throw handleApiError(error);
     }
   }
@@ -331,16 +301,6 @@ class PreventiveMaintenanceService {
       return { success: true, data: response.data, message: 'Maintenance completed successfully' };
     } catch (error: any) {
       console.error('Service error completing maintenance:', error);
-      
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed when completing maintenance. User may need to log in again.');
-        return { 
-          success: false, 
-          message: 'You don\'t have permission to complete this record or your session has expired. Please log in again.' 
-        };
-      }
-      
       throw handleApiError(error);
     }
   }
@@ -358,16 +318,6 @@ class PreventiveMaintenanceService {
       return { success: true, data: response.data, message: 'Maintenance fetched successfully' };
     } catch (error: any) {
       console.error('Service error fetching maintenance:', error);
-      
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed when fetching maintenance. User may need to log in again.');
-        return { 
-          success: false, 
-          message: 'You don\'t have permission to view this record or your session has expired. Please log in again.' 
-        };
-      }
-      
       throw handleApiError(error);
     }
   }
@@ -378,16 +328,6 @@ class PreventiveMaintenanceService {
       return { success: true, data: response.data, message: 'Maintenances fetched successfully' };
     } catch (error: any) {
       console.error('Service error fetching maintenances:', error);
-      
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed when fetching maintenances. User may need to log in again.');
-        return { 
-          success: false, 
-          message: 'You don\'t have permission to view these records or your session has expired. Please log in again.' 
-        };
-      }
-      
       throw handleApiError(error);
     }
   }
@@ -401,16 +341,6 @@ class PreventiveMaintenanceService {
       return { success: true, data: response.data, message: 'Maintenances fetched successfully' };
     } catch (error: any) {
       console.error('Service error fetching with filters:', error);
-      
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed when fetching filtered maintenances. User may need to log in again.');
-        return { 
-          success: false, 
-          message: 'You don\'t have permission to view these records or your session has expired. Please log in again.' 
-        };
-      }
-      
       throw handleApiError(error);
     }
   }
@@ -431,16 +361,6 @@ class PreventiveMaintenanceService {
       return { success: true, data: response.data, message: 'Maintenances fetched successfully' };
     } catch (error: any) {
       console.error(`Service error fetching maintenance for machine ${machineId}:`, error);
-      
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed when fetching machine maintenances. User may need to log in again.');
-        return { 
-          success: false, 
-          message: 'You don\'t have permission to view these records or your session has expired. Please log in again.' 
-        };
-      }
-      
       throw handleApiError(error);
     }
   }
@@ -451,16 +371,6 @@ class PreventiveMaintenanceService {
       return { success: true, data: response.data, message: 'Statistics fetched successfully' };
     } catch (error: any) {
       console.error('Service error fetching maintenance statistics:', error);
-      
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed when fetching statistics. User may need to log in again.');
-        return { 
-          success: false, 
-          message: 'You don\'t have permission to view statistics or your session has expired. Please log in again.' 
-        };
-      }
-      
       throw handleApiError(error);
     }
   }
@@ -483,25 +393,7 @@ class PreventiveMaintenanceService {
         console.warn('Authentication failed when deleting maintenance. User may need to log in again.');
         return { 
           success: false, 
-          message: 'You don\'t have permission to delete this record or your session has expired. Please log in again.' 
-        };
-      }
-      
-      // Check if it's a forbidden error (403)
-      if (error.response?.status === 403) {
-        console.warn('Forbidden when deleting maintenance. User lacks sufficient permissions.');
-        return { 
-          success: false, 
-          message: 'You don\'t have sufficient permissions to delete this record.' 
-        };
-      }
-      
-      // Check if it's a not found error (404)
-      if (error.response?.status === 404) {
-        console.warn('Record not found when trying to delete maintenance.');
-        return { 
-          success: false, 
-          message: 'The maintenance record was not found or has already been deleted.' 
+          message: 'You don\'t have permission to delete this record or your session has expired.' 
         };
       }
       

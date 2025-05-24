@@ -1,6 +1,5 @@
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -8,7 +7,40 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// NextAuth.js Models
+model User {
+  id            String     @id @default(uuid())
+  username      String     @unique
+  email         String?    @unique
+  profile_image String?
+  positions     String     @default("User")
+  created_at    DateTime   @default(now())
+  accessToken   String?
+  refreshToken  String?
+  sessionToken  String?
+  accounts      Account[]
+  sessions      Session[]
+  properties    Property[] @relation("UserProperties") // Direct relation to Property
+  userProperties UserProperty[] // Keep join table for explicit control
+}
+
+model Property {
+  id            String     @id @default(uuid())
+  name          String
+  description   String?
+  created_at    DateTime   @default(now())
+  users         User[]     @relation("UserProperties") // Direct relation to User
+  userProperties UserProperty[]
+}
+
+model UserProperty {
+  userId     String
+  propertyId String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@id([userId, propertyId])
+}
+
 model Account {
   id                 String   @id @default(uuid())
   userId             String
@@ -22,11 +54,8 @@ model Account {
   scope              String?
   id_token           String?  @db.Text
   session_state      String?
-  
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
   @@unique([provider, providerAccountId])
-  @@map("accounts")
 }
 
 model Session {
@@ -34,65 +63,5 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@map("sessions")
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
-
-// Application Models
-model User {
-  id            String     @id @default(uuid())
-  username      String     @unique
-  email         String?    @unique
-  emailVerified DateTime?  @map("email_verified")
-  name          String?
-  image         String?
-  profile_image String?
-  positions     String     @default("User")
-  created_at    DateTime   @default(now())
-  accessToken   String?
-  refreshToken  String?
-  sessionToken  String?
-  
-  // NextAuth Relations
-  accounts       Account[]
-  sessions       Session[]
-  
-  // Application Relations
-  userProperties UserProperty[]
-  
-  @@map("users")
-}
-
-model Property {
-  id            String     @id @default(uuid())
-  name          String
-  description   String?
-  created_at    DateTime   @default(now())
-  
-  userProperties UserProperty[]
-  
-  @@map("properties")
-}
-
-model UserProperty {
-  userId     String
-  propertyId String
-  createdAt  DateTime @default(now())
-  
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@id([userId, propertyId])
-  @@map("user_properties")
 }

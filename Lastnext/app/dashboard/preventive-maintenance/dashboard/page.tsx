@@ -2,11 +2,11 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
-import { PreventiveMaintenanceProvider } from '@/lib/PreventiveContext';
+import { PreventiveMaintenanceProvider } from '@/app/lib/PreventiveContext';
 
 // Dynamically import the dashboard component with no SSR
 const PreventiveMaintenanceDashboard = dynamic(
-  () => import('@/components/preventive/PreventiveMaintenanceDashboard'),
+  () => import('@/app/components/preventive/PreventiveMaintenanceDashboard'),
   { ssr: false }
 );
 
