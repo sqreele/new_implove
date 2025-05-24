@@ -23,9 +23,6 @@ const nextConfig = {
   },
   trailingSlash: true, // Optional, depending on your backend
   
-  // Disable telemetry for Docker builds
-  telemetry: false,
-  
   // Experimental features (if using app directory)
   experimental: {
     // Enable if you're using the app directory structure
