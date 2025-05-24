@@ -16,8 +16,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Initialize shadcn with pinned version for reproducible builds
-RUN npx shadcn@0.9.5 init --yes
-RUN npx shadcn@0.9.5 add accordion alert alert-dialog avatar badge breadcrumb button calendar card carousel checkbox collapsible command context-menu data-table date-picker dialog drawer dropdown-menu form hover-card input input-otp label menubar navigation-menu pagination popover progress radio-group resizable scroll-area select separator sheet skeleton slider sonner switch table tabs textarea toast toggle toggle-group tooltip --yes
+RUN npx shadcn@2.5.0 init --yes
+RUN npx shadcn@2.5.0 add accordion alert alert-dialog avatar badge breadcrumb button calendar card carousel checkbox collapsible command context-menu data-table date-picker dialog drawer dropdown-menu form hover-card input input-otp label menubar navigation-menu pagination popover progress radio-group resizable scroll-area select separator sheet skeleton slider sonner switch table tabs textarea toast toggle toggle-group tooltip --yes
 
 # Generate Prisma client (without database connection)
 RUN npx prisma generate
