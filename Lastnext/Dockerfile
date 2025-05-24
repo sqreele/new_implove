@@ -30,19 +30,19 @@ COPY package-lock.json* ./
 # Smart dependency resolution
 RUN echo "🔍 Analyzing dependency state..." && \
     if [ -f package-lock.json ]; then \
-    echo "📋 Found existing package-lock.json" && \
-    npm ls --depth=0 2>/dev/null || echo "⚠️  Some dependency issues detected" && \
-    if npm ci --dry-run --legacy-peer-deps 2>/dev/null; then \
-    echo "✅ Using existing package-lock.json" && \
-    npm ci --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
+        echo "📋 Found existing package-lock.json" && \
+        npm ls --depth=0 2>/dev/null || echo "⚠️  Some dependency issues detected" && \
+        if npm ci --dry-run --legacy-peer-deps 2>/dev/null; then \
+            echo "✅ Using existing package-lock.json" && \
+            npm ci --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
+        else \
+            echo "🔄 Regenerating package-lock.json due to sync issues" && \
+            rm -f package-lock.json && \
+            npm install --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
+        fi; \
     else \
-    echo "🔄 Regenerating package-lock.json due to sync issues" && \
-    rm -f package-lock.json && \
-    npm install --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
-    fi; \
-    else \
-    echo "📝 Creating new package-lock.json" && \
-    npm install --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
+        echo "📝 Creating new package-lock.json" && \
+        npm install --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
     fi && \
     echo "✅ Dependencies installed successfully"
 
@@ -90,8 +90,8 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
 
 # Initialize shadcn/ui components with error handling
 RUN npx --yes shadcn@2.5.0 init --yes 2>/dev/null || { \
-    echo "shadcn init failed, continuing without it..."; \
-    true; \
+        echo "shadcn init failed, continuing without it..."; \
+        true; \
     }
 
 RUN npx --yes shadcn@2.5.0 add \
@@ -102,15 +102,15 @@ RUN npx --yes shadcn@2.5.0 add \
     progress radio-group resizable scroll-area select separator sheet \
     skeleton slider sonner switch table tabs textarea toast toggle \
     toggle-group tooltip --yes 2>/dev/null || { \
-    echo "Some shadcn components failed to install, continuing..."; \
-    true; \
+        echo "Some shadcn components failed to install, continuing..."; \
+        true; \
     }
 
 # Generate Prisma client (safe without database connection)
 RUN if [ -f prisma/schema.prisma ]; then \
-    npx prisma generate; \
+        npx prisma generate; \
     else \
-    echo "No Prisma schema found, skipping generation..."; \
+        echo "No Prisma schema found, skipping generation..."; \
     fi
 
 # Build the Next.js application
@@ -122,10 +122,10 @@ RUN echo "=== BUILD OUTPUT DEBUG ===" && \
     ls -la /app/.next/ && \
     echo "Checking for standalone build:" && \
     if [ -d "/app/.next/standalone" ]; then \
-    echo "✅ Standalone build found" && \
-    ls -la /app/.next/standalone/; \
+        echo "✅ Standalone build found" && \
+        ls -la /app/.next/standalone/; \
     else \
-    echo "❌ No standalone build found"; \
+        echo "❌ No standalone build found"; \
     fi && \
     echo "=== END DEBUG ==="
 
@@ -145,28 +145,19 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME="0.0.0.0"
 
-# Copy package.json and node_modules for regular Next.js operation
+# Copy essential files for Next.js operation
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-
-# Copy the built Next.js application
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Copy Prisma files if they exist
-RUN mkdir -p ./prisma
-COPY --from=builder /app/prisma ./prisma/ 2>/dev/null || true
-
-# Copy Next.js config files if they exist  
-COPY --from=builder /app/next.config.* ./ 2>/dev/null || true
-COPY --from=builder /app/components.json ./ 2>/dev/null || true
-
 # Copy startup script
-COPY startup.sh ./startup.sh
+COPY --chown=nextjs:nodejs startup.sh ./startup.sh
 RUN chmod +x ./startup.sh
 
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/.next/cache && \
+    mkdir -p ./prisma && \
     chown -R nextjs:nodejs /app
 
 # Add health check
