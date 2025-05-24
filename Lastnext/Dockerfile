@@ -39,17 +39,7 @@ RUN if [ -f package-lock.json ]; then \
         npm install --package-lock-only --legacy-peer-deps; \
     fi
 
-# Install dependencies with optimal settings
-RUN npm ci \
-    --only=production \
-    --legacy-peer-deps \
-    --no-audit \
-    --no-fund \
-    --prefer-offline \
-    --cache /tmp/.npm
-
-# Install dev dependencies in separate layer for better caching
-COPY package.json ./
+# Install all dependencies (including dev dependencies needed for build)
 RUN npm ci \
     --legacy-peer-deps \
     --no-audit \
@@ -97,19 +87,19 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     DATABASE_URL=${DATABASE_URL}
 
 # Initialize shadcn/ui components with error handling
-RUN npx shadcn@2.5.0 init --yes || { \
+RUN npx --yes shadcn@2.5.0 init --yes 2>/dev/null || { \
         echo "shadcn init failed, continuing without it..."; \
         exit 0; \
     }
 
-RUN npx shadcn@2.5.0 add \
+RUN npx --yes shadcn@2.5.0 add \
     accordion alert alert-dialog avatar badge breadcrumb button \
     calendar card carousel checkbox collapsible command context-menu \
     data-table date-picker dialog drawer dropdown-menu form hover-card \
     input input-otp label menubar navigation-menu pagination popover \
     progress radio-group resizable scroll-area select separator sheet \
     skeleton slider sonner switch table tabs textarea toast toggle \
-    toggle-group tooltip --yes || { \
+    toggle-group tooltip --yes 2>/dev/null || { \
         echo "Some shadcn components failed to install, continuing..."; \
         exit 0; \
     }
@@ -124,9 +114,10 @@ RUN if [ -f prisma/schema.prisma ]; then \
 # Build the Next.js application
 RUN npm run build
 
-# Clean up build dependencies to reduce image size
-RUN npm prune --production && \
-    rm -rf .npm /tmp/.npm /root/.npm
+# Clean up dev dependencies and build artifacts to reduce image size
+RUN npm ci --omit=dev --legacy-peer-deps && \
+    npm cache clean --force && \
+    rm -rf /tmp/.npm /root/.npm
 
 # ================================
 # Runner stage - Production runtime
@@ -139,22 +130,22 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME="0.0.0.0"
 
-# Copy built application with proper ownership
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
-COPY --from=builder --chown=nextjs:nodejs /app/package-lock.json ./
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-
-# Copy configuration files if they exist
-COPY --from=builder --chown=nextjs:nodejs /app/next.config.* ./
-COPY --from=builder --chown=nextjs:nodejs /app/components.json* ./
+# Copy all files from builder, then clean up what we don't need
+COPY --from=builder --chown=nextjs:nodejs /app ./temp_copy
+RUN cp -r ./temp_copy/.next ./ && \
+    cp -r ./temp_copy/public ./ && \
+    cp -r ./temp_copy/node_modules ./ && \
+    cp ./temp_copy/package.json ./ && \
+    cp ./temp_copy/package-lock.json ./ && \
+    if [ -f ./temp_copy/next.config.js ]; then cp ./temp_copy/next.config.js ./; fi && \
+    if [ -f ./temp_copy/next.config.mjs ]; then cp ./temp_copy/next.config.mjs ./; fi && \
+    if [ -f ./temp_copy/next.config.ts ]; then cp ./temp_copy/next.config.ts ./; fi && \
+    if [ -f ./temp_copy/components.json ]; then cp ./temp_copy/components.json ./; fi && \
+    rm -rf ./temp_copy
 
 # Copy Prisma files if they exist
-RUN if [ -d /app/prisma ]; then \
-        mkdir -p ./prisma; \
-    fi
-COPY --from=builder --chown=nextjs:nodejs /app/prisma* ./prisma/ 2>/dev/null || true
+RUN mkdir -p ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma/ || echo "No Prisma files found, skipping..."
 
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/.next/cache && \
