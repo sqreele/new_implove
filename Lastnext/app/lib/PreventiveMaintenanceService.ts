@@ -375,6 +375,7 @@ class PreventiveMaintenanceService {
     }
   }
 
+  // Updated delete method to use enhanced authentication
   async deletePreventiveMaintenance(id: string): Promise<ServiceResponse<null>> {
     if (!id) {
       console.error('Cannot delete: PM ID is undefined or empty');
@@ -383,17 +384,68 @@ class PreventiveMaintenanceService {
   
     try {
       console.log(`Attempting to delete preventive maintenance with ID: ${id}`);
-      await apiClient.delete(`${this.baseUrl}/${id}/`);
+      
+      // Import the enhanced auth helper
+      const { makeAuthenticatedRequest, getCurrentSession } = await import('./auth-helpers');
+      
+      // Check if user is authenticated first
+      const session = await getCurrentSession();
+      if (!session) {
+        return { 
+          success: false, 
+          message: 'You must be logged in to delete maintenance records.' 
+        };
+      }
+
+      // Use our Next.js API route for deletion with authentication
+      const response = await makeAuthenticatedRequest(`${this.baseUrl}/${id}/`, {
+        method: 'DELETE',
+      });
+
+      if (response.status === 403) {
+        return { 
+          success: false, 
+          message: 'You don\'t have permission to delete this maintenance record. Please contact an administrator.' 
+        };
+      }
+      
+      if (response.status === 401) {
+        return { 
+          success: false, 
+          message: 'Your session has expired. Please log in again to continue.' 
+        };
+      }
+      
+      if (response.status === 404) {
+        return { 
+          success: false, 
+          message: 'This maintenance record no longer exists or has already been deleted.' 
+        };
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Failed to delete maintenance record (${response.status})`);
+      }
+
+      console.log(`Successfully deleted preventive maintenance with ID: ${id}`);
       return { success: true, data: null, message: 'Maintenance deleted successfully' };
     } catch (error: any) {
       console.error(`Service error deleting maintenance ${id}:`, error);
       
-      // Check if it's an authentication error (401)
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed when deleting maintenance. User may need to log in again.');
+      // Handle network errors
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
         return { 
           success: false, 
-          message: 'You don\'t have permission to delete this record or your session has expired.' 
+          message: 'Network error. Please check your connection and try again.' 
+        };
+      }
+      
+      // Handle authentication errors
+      if (error.message.includes('authentication')) {
+        return { 
+          success: false, 
+          message: 'Authentication failed. Please log in again.' 
         };
       }
       
