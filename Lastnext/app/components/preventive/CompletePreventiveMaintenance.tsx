@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { usePreventiveMaintenance,PreventiveMaintenanceCompleteRequest  } from '@/app/lib/PreventiveContext'; // Fixed import path
-import {  MaintenanceImage } from '@/app/lib/preventiveMaintenanceModels';
-
+import { usePreventiveMaintenance, PreventiveMaintenanceCompleteRequest } from '@/app/lib/PreventiveContext';
+import { MaintenanceImage } from '@/app/lib/preventiveMaintenanceModels';
+import React from 'react';
 
 interface CompletePreventiveMaintenanceProps {
   params: {
@@ -13,7 +13,7 @@ interface CompletePreventiveMaintenanceProps {
   };
 }
 
-export default function CompletePreventiveMaintenance({ params }: CompletePreventiveMaintenanceProps): JSX.Element {
+export default function CompletePreventiveMaintenance({ params }: CompletePreventiveMaintenanceProps) {
   const router = useRouter();
   const pmId = params?.id;
   
