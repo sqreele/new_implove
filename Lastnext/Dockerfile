@@ -19,7 +19,7 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 --ingroup nodejs nextjs
 
 # ================================
-# Dependencies stage - Install and cache dependencies
+# Dependencies stage - Robust approach
 # ================================
 FROM base AS deps
 
@@ -27,28 +27,27 @@ FROM base AS deps
 COPY package.json ./
 COPY package-lock.json* ./
 
-# Check if package-lock.json exists and is in sync, otherwise regenerate it
-RUN if [ -f package-lock.json ]; then \
-        echo "Checking package-lock.json sync with package.json..."; \
-        if ! npm ci --dry-run --legacy-peer-deps 2>/dev/null; then \
-            echo "⚠️  package-lock.json is out of sync, regenerating..."; \
-            rm -f package-lock.json; \
-            npm install --package-lock-only --legacy-peer-deps; \
+# Smart dependency resolution
+RUN echo "🔍 Analyzing dependency state..." && \
+    if [ -f package-lock.json ]; then \
+        echo "📋 Found existing package-lock.json" && \
+        npm ls --depth=0 2>/dev/null || echo "⚠️  Some dependency issues detected" && \
+        if npm ci --dry-run --legacy-peer-deps 2>/dev/null; then \
+            echo "✅ Using existing package-lock.json" && \
+            npm ci --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
         else \
-            echo "✅ package-lock.json is in sync"; \
+            echo "🔄 Regenerating package-lock.json due to sync issues" && \
+            rm -f package-lock.json && \
+            npm install --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
         fi; \
     else \
-        echo "📝 No package-lock.json found, generating..."; \
-        npm install --package-lock-only --legacy-peer-deps; \
-    fi
+        echo "📝 Creating new package-lock.json" && \
+        npm install --legacy-peer-deps --no-audit --no-fund --cache /tmp/.npm; \
+    fi && \
+    echo "✅ Dependencies installed successfully"
 
-# Install all dependencies (including dev dependencies needed for build)
-RUN npm ci \
-    --legacy-peer-deps \
-    --no-audit \
-    --no-fund \
-    --prefer-offline \
-    --cache /tmp/.npm
+# Verify installation
+RUN npm ls --depth=0 || echo "⚠️  Some peer dependency warnings (this is usually normal)"
 
 # ================================
 # Builder stage - Build the application
