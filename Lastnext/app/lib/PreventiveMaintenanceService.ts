@@ -376,78 +376,50 @@ class PreventiveMaintenanceService {
   }
 
   // Updated delete method to use Next.js API route instead of direct Django call
-  async deletePreventiveMaintenance(id: string): Promise<ServiceResponse<null>> {
-    if (!id) {
-      console.error('Cannot delete: PM ID is undefined or empty');
-      return { success: false, message: 'PM ID is required for deletion' };
-    }
-  
-    try {
-      console.log(`Attempting to delete preventive maintenance with ID: ${id}`);
-      
-      // Use fetch directly to call our Next.js API route instead of apiClient
-      const response = await fetch(`${this.baseUrl}/${id}/`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // Include credentials to ensure session is sent
-        credentials: 'include',
-      });
-
-      if (response.status === 403) {
-        let detailedMessage = 'You don\'t have permission to delete this maintenance record. Please contact an administrator.'; // Default message
-        try {
-          const errorData = await response.json(); // Attempt to parse JSON from the response body
-          if (errorData && (errorData.message || errorData.detail)) {
-            detailedMessage = errorData.message || errorData.detail; // Use message from API if available
-          }
-        } catch (e) {
-          // If JSON parsing fails (e.g., empty or non-JSON response), use the default message.
-          // console.warn('Could not parse error details from 403 response body, using default message.', e);
-        }
-        return { 
-          success: false, 
-          message: detailedMessage 
-        };
-      }
-      
-      if (response.status === 401) {
-        return { 
-          success: false, 
-          message: 'Your session has expired. Please log in again to continue.' 
-        };
-      }
-      
-      if (response.status === 404) {
-        return { 
-          success: false, 
-          message: 'This maintenance record no longer exists or has already been deleted.' 
-        };
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.message || `Failed to delete maintenance record (${response.status})`);
-      }
-
-      console.log(`Successfully deleted preventive maintenance with ID: ${id}`);
-      return { success: true, data: null, message: 'Maintenance deleted successfully' };
-    } catch (error: any) {
-      console.error(`Service error deleting maintenance ${id}:`, error);
-      
-      // Handle network errors
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        return { 
-          success: false, 
-          message: 'Network error. Please check your connection and try again.' 
-        };
-      }
-      
-      // Use the existing error handler for other errors
-      throw handleApiError(error);
-    }
+// Fixed delete method that uses apiClient for proper authentication
+async deletePreventiveMaintenance(id: string): Promise<ServiceResponse<null>> {
+  if (!id) {
+    console.error('Cannot delete: PM ID is undefined or empty');
+    return { success: false, message: 'PM ID is required for deletion' };
   }
+
+  try {
+    console.log(`Attempting to delete preventive maintenance with ID: ${id}`);
+    
+    // Use apiClient instead of fetch to ensure proper authentication
+    await apiClient.delete(`${this.baseUrl}/${id}/`);
+
+    console.log(`Successfully deleted preventive maintenance with ID: ${id}`);
+    return { success: true, data: null, message: 'Maintenance deleted successfully' };
+  } catch (error: any) {
+    console.error(`Service error deleting maintenance ${id}:`, error);
+    
+    // Handle specific error cases
+    if (error.status === 403) {
+      return { 
+        success: false, 
+        message: error.details?.detail || 'You don\'t have permission to delete this maintenance record. Please contact an administrator.' 
+      };
+    }
+    
+    if (error.status === 401) {
+      return { 
+        success: false, 
+        message: 'Your session has expired. Please log in again to continue.' 
+      };
+    }
+    
+    if (error.status === 404) {
+      return { 
+        success: false, 
+        message: 'This maintenance record no longer exists or has already been deleted.' 
+      };
+    }
+    
+    // For other errors, use the existing error handler
+    throw handleApiError(error);
+  }
+}
 }
 
 export default new PreventiveMaintenanceService();
