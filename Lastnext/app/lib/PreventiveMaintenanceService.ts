@@ -1,12 +1,14 @@
 import apiClient from './api-client';
-import { handleApiError } from './api-client';
+import { handleApiError, ApiError } from './api-client';
 import {
   validateFrequency,
   type PreventiveMaintenance,
   type FrequencyType,
   type ServiceResponse,
 } from './preventiveMaintenanceModels';
-
+import { getSession } from "next-auth/react";
+import { jwtDecode } from "jwt-decode";
+import axios from "axios";
 export type CreatePreventiveMaintenanceData = {
   pmtitle: string;
   scheduled_date: string;
@@ -377,6 +379,7 @@ class PreventiveMaintenanceService {
 
   // Updated delete method to use Next.js API route instead of direct Django call
 // Fixed delete method that uses apiClient for proper authentication
+// Debug version to help identify the authentication issue
 async deletePreventiveMaintenance(id: string): Promise<ServiceResponse<null>> {
   if (!id) {
     console.error('Cannot delete: PM ID is undefined or empty');
@@ -384,15 +387,50 @@ async deletePreventiveMaintenance(id: string): Promise<ServiceResponse<null>> {
   }
 
   try {
+    console.log(`=== DELETE PREVENTIVE MAINTENANCE DEBUG ===`);
     console.log(`Attempting to delete preventive maintenance with ID: ${id}`);
     
-    // Use apiClient instead of fetch to ensure proper authentication
-    await apiClient.delete(`${this.baseUrl}/${id}/`);
+    // Debug: Check session before making the request
+    const session = await getSession();
+    console.log('Session data:', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      hasAccessToken: !!session?.user?.accessToken,
+      hasRefreshToken: !!session?.user?.refreshToken,
+      accessTokenLength: session?.user?.accessToken?.length || 0
+    });
 
+    // Debug: If we have a token, check if it's expired
+    if (session?.user?.accessToken) {
+      try {
+        const decoded = jwtDecode<any>(session.user.accessToken);
+        const currentTime = Math.floor(Date.now() / 1000);
+        console.log('Token info:', {
+          exp: decoded.exp,
+          currentTime,
+          isExpired: decoded.exp ? decoded.exp < currentTime : 'unknown',
+          timeUntilExpiry: decoded.exp ? decoded.exp - currentTime : 'unknown'
+        });
+      } catch (e) {
+        console.error('Failed to decode token:', e);
+      }
+    }
+
+    // Make the delete request
+    const response = await apiClient.delete(`${this.baseUrl}/${id}/`);
+    
     console.log(`Successfully deleted preventive maintenance with ID: ${id}`);
     return { success: true, data: null, message: 'Maintenance deleted successfully' };
   } catch (error: any) {
+    console.error(`=== DELETE ERROR DEBUG ===`);
     console.error(`Service error deleting maintenance ${id}:`, error);
+    console.error('Error details:', {
+      status: error.status,
+      message: error.message,
+      details: error.details,
+      isApiError: error instanceof ApiError,
+      isAxiosError: axios.isAxiosError(error)
+    });
     
     // Handle specific error cases
     if (error.status === 403) {
