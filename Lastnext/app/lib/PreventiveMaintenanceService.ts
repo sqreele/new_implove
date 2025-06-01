@@ -396,9 +396,19 @@ class PreventiveMaintenanceService {
       });
 
       if (response.status === 403) {
+        let detailedMessage = 'You don\'t have permission to delete this maintenance record. Please contact an administrator.'; // Default message
+        try {
+          const errorData = await response.json(); // Attempt to parse JSON from the response body
+          if (errorData && (errorData.message || errorData.detail)) {
+            detailedMessage = errorData.message || errorData.detail; // Use message from API if available
+          }
+        } catch (e) {
+          // If JSON parsing fails (e.g., empty or non-JSON response), use the default message.
+          // console.warn('Could not parse error details from 403 response body, using default message.', e);
+        }
         return { 
           success: false, 
-          message: 'You don\'t have permission to delete this maintenance record. Please contact an administrator.' 
+          message: detailedMessage 
         };
       }
       
