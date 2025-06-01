@@ -1,4 +1,3 @@
-
 // ./app/lib/api-client.ts - Improved version
 "use client";
 
