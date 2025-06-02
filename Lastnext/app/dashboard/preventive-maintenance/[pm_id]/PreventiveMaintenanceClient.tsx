@@ -1,7 +1,7 @@
 // app/dashboard/preventive-maintenance/[pm_id]/PreventiveMaintenanceClient.tsx
 
 'use client';
-
+import preventiveMaintenanceService from '@/app/lib/PreventiveMaintenanceService';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -34,32 +34,27 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
     if (!window.confirm('Are you sure you want to delete this maintenance record?')) {
       return;
     }
-
+  
     setIsLoading(true);
     setError(null);
-
+  
     try {
-      const response = await fetch(`/api/preventive-maintenance/${maintenanceData.pm_id}/`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.message || 'Failed to delete maintenance record');
+      // Use the service instead of direct fetch - this ensures proper authentication
+      const response = await preventiveMaintenanceService.deletePreventiveMaintenance(maintenanceData.pm_id);
+  
+      if (response.success) {
+        router.push('/dashboard/preventive-maintenance');
+        router.refresh(); // Refresh the Next.js cache
+      } else {
+        throw new Error(response.message || 'Failed to delete maintenance record');
       }
-
-      router.push('/dashboard/preventive-maintenance');
-      router.refresh(); // Refresh the Next.js cache
     } catch (err: any) {
       console.error('Error deleting maintenance:', err);
       setError(err.message || 'An error occurred while deleting');
     } finally {
       setIsLoading(false);
     }
-  };
+  }
   
   // Function to mark maintenance as complete (if needed)
   const handleMarkComplete = async () => {
