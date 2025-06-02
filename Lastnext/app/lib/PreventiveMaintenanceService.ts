@@ -380,70 +380,142 @@ class PreventiveMaintenanceService {
   // Updated delete method to use Next.js API route instead of direct Django call
 // Fixed delete method that uses apiClient for proper authentication
 // Debug version to help identify the authentication issue
-async deletePreventiveMaintenance(id: string): Promise<ServiceResponse<null>> {
+// Enhanced debug version for the delete method
+// Add this to your PreventiveMaintenanceService class
+
+async deletePreventiveMaintenanceDebug(id: string): Promise<ServiceResponse<null>> {
   if (!id) {
     console.error('Cannot delete: PM ID is undefined or empty');
     return { success: false, message: 'PM ID is required for deletion' };
   }
 
   try {
-    console.log(`=== DELETE PREVENTIVE MAINTENANCE DEBUG ===`);
+    console.log(`=== ENHANCED DELETE DEBUG ===`);
     console.log(`Attempting to delete preventive maintenance with ID: ${id}`);
     
     // Debug: Check session before making the request
     const session = await getSession();
-    console.log('Session data:', {
+    console.log('Session debug:', {
       hasSession: !!session,
       hasUser: !!session?.user,
       hasAccessToken: !!session?.user?.accessToken,
       hasRefreshToken: !!session?.user?.refreshToken,
-      accessTokenLength: session?.user?.accessToken?.length || 0
+      userEmail: session?.user?.email,
+      accessTokenLength: session?.user?.accessToken?.length || 0,
+      refreshTokenLength: session?.user?.refreshToken?.length || 0
     });
 
-    // Debug: If we have a token, check if it's expired
+    // Debug: If we have a token, check if it's expired and decode it
     if (session?.user?.accessToken) {
       try {
         const decoded = jwtDecode<any>(session.user.accessToken);
         const currentTime = Math.floor(Date.now() / 1000);
-        console.log('Token info:', {
+        console.log('Token debug info:', {
+          tokenType: typeof session.user.accessToken,
+          tokenPrefix: session.user.accessToken.substring(0, 20) + '...',
           exp: decoded.exp,
+          iat: decoded.iat,
+          userId: decoded.user_id,
           currentTime,
           isExpired: decoded.exp ? decoded.exp < currentTime : 'unknown',
-          timeUntilExpiry: decoded.exp ? decoded.exp - currentTime : 'unknown'
+          timeUntilExpiry: decoded.exp ? decoded.exp - currentTime : 'unknown',
+          timeUntilExpiryMinutes: decoded.exp ? Math.floor((decoded.exp - currentTime) / 60) : 'unknown'
         });
       } catch (e) {
         console.error('Failed to decode token:', e);
+        console.log('Token that failed to decode:', session.user.accessToken?.substring(0, 50) + '...');
       }
     }
 
-    // Make the delete request
-    const response = await apiClient.delete(`${this.baseUrl}/${id}/`);
+    // Debug: Check what headers will be sent
+    console.log('Current axios default headers:', apiClient.defaults.headers);
     
-    console.log(`Successfully deleted preventive maintenance with ID: ${id}`);
+    // Debug: Make a test authenticated request first to verify auth is working
+    console.log('=== TESTING AUTH WITH GET REQUEST ===');
+    try {
+      const testResponse = await apiClient.get(`${this.baseUrl}/${id}/`);
+      console.log('GET request successful - auth is working:', testResponse.status);
+    } catch (getError: any) {
+      console.error('GET request failed - auth issue confirmed:', {
+        status: getError.response?.status,
+        message: getError.message,
+        headers: getError.config?.headers
+      });
+      
+      // If GET fails with 401, don't proceed with DELETE
+      if (getError.response?.status === 401) {
+        return { 
+          success: false, 
+          message: 'Authentication failed. Unable to verify access to this record before deletion.' 
+        };
+      }
+    }
+
+    // Debug: Log the exact request configuration
+    console.log('=== MAKING DELETE REQUEST ===');
+    const deleteConfig = {
+      method: 'DELETE',
+      url: `${this.baseUrl}/${id}/`,
+      headers: apiClient.defaults.headers
+    };
+    console.log('Delete request config:', deleteConfig);
+
+    // Make the delete request with additional logging
+    const response = await apiClient.delete(`${this.baseUrl}/${id}/`, {
+      // Add custom config to log the actual headers sent
+      transformRequest: [(data, headers) => {
+        console.log('Actual headers being sent:', headers);
+        return data;
+      }]
+    });
+    
+    console.log(`Successfully deleted preventive maintenance with ID: ${id}`, response.status);
     return { success: true, data: null, message: 'Maintenance deleted successfully' };
+    
   } catch (error: any) {
-    console.error(`=== DELETE ERROR DEBUG ===`);
+    console.error(`=== DELETE ERROR DETAILED DEBUG ===`);
     console.error(`Service error deleting maintenance ${id}:`, error);
+    
+    // Enhanced error logging
     console.error('Error details:', {
-      status: error.status,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers,
+        timeout: error.config?.timeout
+      },
       message: error.message,
-      details: error.details,
       isApiError: error instanceof ApiError,
       isAxiosError: axios.isAxiosError(error)
     });
+    
+    // Check if it's specifically an auth error
+    if (error.response?.status === 401) {
+      console.error('=== 401 UNAUTHORIZED ANALYSIS ===');
+      console.error('Response headers:', error.response.headers);
+      console.error('Response data:', error.response.data);
+      
+      // Check if Django is expecting a different auth format
+      const wwwAuthHeader = error.response.headers['www-authenticate'];
+      if (wwwAuthHeader) {
+        console.error('WWW-Authenticate header:', wwwAuthHeader);
+      }
+      
+      return { 
+        success: false, 
+        message: 'Authentication failed. Please check the browser console for detailed debug information and try logging out and back in.' 
+      };
+    }
     
     // Handle specific error cases
     if (error.status === 403) {
       return { 
         success: false, 
         message: error.details?.detail || 'You don\'t have permission to delete this maintenance record. Please contact an administrator.' 
-      };
-    }
-    
-    if (error.status === 401) {
-      return { 
-        success: false, 
-        message: 'Your session has expired. Please log in again to continue.' 
       };
     }
     
@@ -458,6 +530,54 @@ async deletePreventiveMaintenance(id: string): Promise<ServiceResponse<null>> {
     throw handleApiError(error);
   }
 }
-}
 
+// Alternative: Simplified delete that bypasses interceptors for testing
+async deletePreventiveMaintenanceSimple(id: string): Promise<ServiceResponse<null>> {
+  if (!id) {
+    return { success: false, message: 'PM ID is required for deletion' };
+  }
+
+  try {
+    console.log('=== SIMPLE DELETE TEST ===');
+    
+    const session = await getSession();
+    if (!session?.user?.accessToken) {
+      return { success: false, message: 'No access token available' };
+    }
+
+    // Use fetch instead of axios to bypass interceptors
+    const response = await fetch(`${apiClient.defaults.baseURL}${this.baseUrl}/${id}/`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${session.user.accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+
+    console.log('Fetch response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Fetch error response:', errorText);
+      
+      if (response.status === 401) {
+        return { success: false, message: 'Authentication failed with direct fetch request' };
+      }
+      
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return { success: true, data: null, message: 'Maintenance deleted successfully (via fetch)' };
+    
+  } catch (error: any) {
+    console.error('Simple delete error:', error);
+    throw handleApiError(error);
+  }
+}
+}
 export default new PreventiveMaintenanceService();
