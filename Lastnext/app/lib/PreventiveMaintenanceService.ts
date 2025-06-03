@@ -9,6 +9,7 @@ import {
 import { getSession } from "next-auth/react";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
+
 export type CreatePreventiveMaintenanceData = {
   pmtitle: string;
   scheduled_date: string;
@@ -32,6 +33,7 @@ export interface CompletePreventiveMaintenanceData {
   after_image?: File;
 }
 
+// Fixed interface to match your Django API response
 export interface DashboardStats {
   avg_completion_times: Record<string, number>; 
   counts: {
@@ -40,10 +42,12 @@ export interface DashboardStats {
     pending: number;
     overdue: number;
   };
+  // Fixed to match Django API response structure
   frequency_distribution: {
-    name: string;
-    value: number;
+    frequency: string;  // Changed from 'name' to 'frequency'
+    count: number;      // Changed from 'value' to 'count'
   }[];
+  completion_rate?: number; // Added from Django response
   machine_distribution?: {
     machine_id: string;
     name: string;
@@ -368,87 +372,162 @@ class PreventiveMaintenanceService {
     }
   }
 
- // Updated getMaintenanceStatistics method to include avg_completion_times in empty stats
-async getMaintenanceStatistics(): Promise<ServiceResponse<DashboardStats>> {
-  try {
-    const response = await apiClient.get<DashboardStats>(`${this.baseUrl}/stats/`);
-    return { success: true, data: response.data, message: 'Statistics fetched successfully' };
-  } catch (error: any) {
-    console.error('Service error fetching maintenance statistics:', error);
-    
-    // Handle the case where no data exists (404 error)
-    if (error.status === 404 || (error.response && error.response.status === 404)) {
-      console.log('No maintenance data found, returning empty statistics');
-      const emptyStats: DashboardStats = {
-        counts: {
-          total: 0,
-          completed: 0,
-          pending: 0,
-          overdue: 0
-        },
-        frequency_distribution: [],
-        avg_completion_times: {}, // Added missing property as empty object
-        upcoming: []
-      };
-      return { success: true, data: emptyStats, message: 'No maintenance data found' };
+  // Updated getMaintenanceStatistics method
+  async getMaintenanceStatistics(): Promise<ServiceResponse<DashboardStats>> {
+    try {
+      const response = await apiClient.get<DashboardStats>(`${this.baseUrl}/stats/`);
+      console.log('=== MAINTENANCE STATISTICS DEBUG ===');
+      console.log('Raw stats response:', response.data);
+      console.log('Frequency distribution:', response.data.frequency_distribution);
+      console.log('Upcoming tasks:', response.data.upcoming);
+      console.log('Avg completion times:', response.data.avg_completion_times);
+      
+      return { success: true, data: response.data, message: 'Statistics fetched successfully' };
+    } catch (error: any) {
+      console.error('Service error fetching maintenance statistics:', error);
+      
+      // Handle the case where no data exists (404 error)
+      if (error.status === 404 || (error.response && error.response.status === 404)) {
+        console.log('No maintenance data found, returning empty statistics');
+        const emptyStats: DashboardStats = {
+          counts: {
+            total: 0,
+            completed: 0,
+            pending: 0,
+            overdue: 0
+          },
+          frequency_distribution: [],
+          avg_completion_times: {}, // Added missing property as empty object
+          upcoming: []
+        };
+        return { success: true, data: emptyStats, message: 'No maintenance data found' };
+      }
+      
+      throw handleApiError(error);
     }
-    
-    throw handleApiError(error);
+  }
+
+  // NEW: Get upcoming maintenance with custom days parameter
+  async getUpcomingMaintenance(days: number = 30): Promise<ServiceResponse<PreventiveMaintenance[]>> {
+    try {
+      console.log(`=== FETCHING UPCOMING MAINTENANCE ===`);
+      console.log(`Fetching upcoming maintenance for next ${days} days`);
+      
+      const response = await apiClient.get<PreventiveMaintenance[]>(
+        `${this.baseUrl}/upcoming/`,
+        { params: { days } }
+      );
+      
+      console.log(`Found ${response.data.length} upcoming maintenance tasks`);
+      console.log('Upcoming tasks:', response.data);
+      
+      return { success: true, data: response.data, message: 'Upcoming maintenance fetched successfully' };
+    } catch (error: any) {
+      console.error('Service error fetching upcoming maintenance:', error);
+      throw handleApiError(error);
+    }
+  }
+
+  // NEW: Enhanced stats method that gets more upcoming data
+  async getEnhancedStatistics(upcomingDays: number = 30): Promise<ServiceResponse<DashboardStats>> {
+    try {
+      console.log('=== FETCHING ENHANCED STATISTICS ===');
+      
+      // Get regular stats first
+      const statsResponse = await this.getMaintenanceStatistics();
+      if (!statsResponse.success || !statsResponse.data) {
+        return statsResponse;
+      }
+
+      // Get more comprehensive upcoming maintenance
+      const upcomingResponse = await this.getUpcomingMaintenance(upcomingDays);
+      
+      if (upcomingResponse.success && upcomingResponse.data) {
+        // Combine the data - replace the limited upcoming from stats with comprehensive upcoming
+        const enhancedStats: DashboardStats = {
+          ...statsResponse.data,
+          upcoming: upcomingResponse.data
+        };
+        
+        console.log(`Enhanced stats: ${enhancedStats.upcoming.length} upcoming tasks (${upcomingDays} days)`);
+        return { success: true, data: enhancedStats, message: 'Enhanced statistics fetched successfully' };
+      }
+      
+      // If upcoming fails, just return regular stats
+      return statsResponse;
+    } catch (error: any) {
+      console.error('Service error fetching enhanced statistics:', error);
+      throw handleApiError(error);
+    }
+  }
+
+  // NEW: Debug method to help troubleshoot data
+  async debugMaintenanceData(): Promise<void> {
+    try {
+      console.log('=== DEBUG MAINTENANCE DATA ===');
+      
+      // Test stats endpoint
+      const statsResponse = await apiClient.get<any>(`${this.baseUrl}/stats/`);
+      console.log('Stats response:', statsResponse.data);
+      console.log('Stats upcoming length:', statsResponse.data.upcoming?.length || 0);
+      
+      // Test upcoming endpoint
+      const upcomingResponse = await apiClient.get<any>(`${this.baseUrl}/upcoming/?days=30`);
+      console.log('Upcoming endpoint response length:', upcomingResponse.data?.length || 0);
+      console.log('Upcoming endpoint response:', upcomingResponse.data);
+      
+      // Test general maintenance list
+      const allResponse = await apiClient.get<any>(`${this.baseUrl}/`);
+      console.log('All maintenance count:', allResponse.data?.length || 0);
+      
+    } catch (error) {
+      console.error('Debug error:', error);
+    }
+  }
+
+  async deletePreventiveMaintenance(id: string): Promise<ServiceResponse<null>> {
+    if (!id) {
+      console.error('Cannot delete: PM ID is undefined or empty');
+      return { success: false, message: 'PM ID is required for deletion' };
+    }
+
+    try {
+      console.log(`=== DELETE PREVENTIVE MAINTENANCE ===`);
+      console.log(`Attempting to delete preventive maintenance with ID: ${id}`);
+      
+      const response = await apiClient.delete(`${this.baseUrl}/${id}/`);
+      
+      console.log(`Successfully deleted preventive maintenance with ID: ${id}`);
+      return { success: true, data: null, message: 'Maintenance deleted successfully' };
+    } catch (error: any) {
+      console.error(`Service error deleting maintenance ${id}:`, error);
+      
+      // Handle specific error cases
+      if (error.status === 403) {
+        return { 
+          success: false, 
+          message: error.details?.detail || 'You don\'t have permission to delete this maintenance record. Please contact an administrator.' 
+        };
+      }
+      
+      if (error.status === 401) {
+        return { 
+          success: false, 
+          message: 'Your session has expired. Please log in again to continue.' 
+        };
+      }
+      
+      if (error.status === 404) {
+        return { 
+          success: false, 
+          message: 'This maintenance record no longer exists or has already been deleted.' 
+        };
+      }
+      
+      // For other errors, use the existing error handler
+      throw handleApiError(error);
+    }
   }
 }
 
-  // Updated delete method to use Next.js API route instead of direct Django call
-// Fixed delete method that uses apiClient for proper authentication
-// Debug version to help identify the authentication issue
-// Enhanced debug version for the delete method
-// Add this to your PreventiveMaintenanceService class
-
-// Enhanced debug version AND original working method
-// Add BOTH of these methods to your PreventiveMaintenanceService class
-
-// Original working method (restore this)
-async deletePreventiveMaintenance(id: string): Promise<ServiceResponse<null>> {
-  if (!id) {
-    console.error('Cannot delete: PM ID is undefined or empty');
-    return { success: false, message: 'PM ID is required for deletion' };
-  }
-
-  try {
-    console.log(`=== DELETE PREVENTIVE MAINTENANCE ===`);
-    console.log(`Attempting to delete preventive maintenance with ID: ${id}`);
-    
-    const response = await apiClient.delete(`${this.baseUrl}/${id}/`);
-    
-    console.log(`Successfully deleted preventive maintenance with ID: ${id}`);
-    return { success: true, data: null, message: 'Maintenance deleted successfully' };
-  } catch (error: any) {
-    console.error(`Service error deleting maintenance ${id}:`, error);
-    
-    // Handle specific error cases
-    if (error.status === 403) {
-      return { 
-        success: false, 
-        message: error.details?.detail || 'You don\'t have permission to delete this maintenance record. Please contact an administrator.' 
-      };
-    }
-    
-    if (error.status === 401) {
-      return { 
-        success: false, 
-        message: 'Your session has expired. Please log in again to continue.' 
-      };
-    }
-    
-    if (error.status === 404) {
-      return { 
-        success: false, 
-        message: 'This maintenance record no longer exists or has already been deleted.' 
-      };
-    }
-    
-    // For other errors, use the existing error handler
-    throw handleApiError(error);
-  }
-}
-}
 export default new PreventiveMaintenanceService();

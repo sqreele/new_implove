@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext'; // Fixed import path
 import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
+import preventiveMaintenanceService from '@/app/lib/PreventiveMaintenanceService'; // Add this import
 
-// Define interface for frequency distribution item - Fixed to match actual data structure
+// Updated interface to match Django API response
 interface FrequencyDistributionItem {
-  name: string;  // Back to 'name' as per TypeScript error
-  value: number; // Back to 'value' as per TypeScript error
+  frequency: string; // Changed to match Django API response
+  count: number;     // Changed to match Django API response
 }
 
 // Helper function to get image URL
@@ -61,12 +62,12 @@ const determinePMStatus = (item: PreventiveMaintenance): string => {
   return 'pending';
 };
 
-// Helper function to safely format frequency name - Fixed parameter name
-const formatFrequencyName = (name: string | undefined | null): string => {
-  if (!name || typeof name !== 'string') {
+// Updated helper function to safely format frequency name
+const formatFrequencyName = (frequency: string | undefined | null): string => {
+  if (!frequency || typeof frequency !== 'string') {
     return 'Unknown';
   }
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  return frequency.charAt(0).toUpperCase() + frequency.slice(1);
 };
 
 export default function PreventiveMaintenanceDashboard() {
@@ -82,6 +83,18 @@ export default function PreventiveMaintenanceDashboard() {
   useEffect(() => {
     fetchStatistics();
   }, [fetchStatistics]);
+
+  // Debug effect to log statistics data
+  useEffect(() => {
+    if (statistics) {
+      console.log('=== DASHBOARD DEBUG ===');
+      console.log('Statistics object:', statistics);
+      console.log('Frequency distribution:', statistics.frequency_distribution);
+      console.log('Upcoming array:', statistics.upcoming);
+      console.log('Upcoming length:', statistics.upcoming?.length);
+      console.log('Avg completion times:', statistics.avg_completion_times);
+    }
+  }, [statistics]);
 
   // Format date
   const formatDate = (dateString: string | null | undefined): string => {
@@ -114,6 +127,15 @@ export default function PreventiveMaintenanceDashboard() {
   // Get maintenance title with fallback
   const getMaintenanceTitle = (item: PreventiveMaintenance): string => {
     return item.pmtitle || `Maintenance #${item.pm_id}`;
+  };
+
+  // Debug function to call service debug
+  const handleDebugClick = async () => {
+    try {
+      await preventiveMaintenanceService.debugMaintenanceData();
+    } catch (error) {
+      console.error('Debug failed:', error);
+    }
   };
   
   if (isLoading) {
@@ -179,6 +201,44 @@ export default function PreventiveMaintenanceDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Debug Section (remove in production) */}
+      {process.env.NODE_ENV === 'development' && statistics && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-medium text-yellow-800">Debug Information</h3>
+            <button 
+              onClick={handleDebugClick}
+              className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded hover:bg-yellow-300"
+            >
+              Run Debug
+            </button>
+          </div>
+          <div className="text-xs text-yellow-700 space-y-1">
+            <p><strong>Total tasks:</strong> {statistics.counts.total}</p>
+            <p><strong>Frequency distribution length:</strong> {statistics.frequency_distribution?.length || 0}</p>
+            <p><strong>Upcoming tasks length:</strong> {statistics.upcoming?.length || 0}</p>
+            <p><strong>Avg completion times keys:</strong> {Object.keys(statistics.avg_completion_times || {}).join(', ')}</p>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-yellow-600 hover:text-yellow-800">Show raw data</summary>
+              <div className="mt-2 space-y-2">
+                <div>
+                  <strong>Frequency Distribution:</strong>
+                  <pre className="text-xs bg-yellow-100 p-2 rounded mt-1 overflow-x-auto">
+                    {JSON.stringify(statistics.frequency_distribution, null, 2)}
+                  </pre>
+                </div>
+                <div>
+                  <strong>Upcoming Tasks:</strong>
+                  <pre className="text-xs bg-yellow-100 p-2 rounded mt-1 overflow-x-auto max-h-32">
+                    {JSON.stringify(statistics.upcoming, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+      )}
 
       {/* Main Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -260,18 +320,18 @@ export default function PreventiveMaintenanceDashboard() {
         </p>
       </div>
       
-      {/* Frequency Distribution - Fixed to use name and value properties */}
+      {/* Frequency Distribution - Fixed to use frequency and count properties */}
       {statistics.frequency_distribution && Array.isArray(statistics.frequency_distribution) && statistics.frequency_distribution.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Maintenance Frequency Distribution</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {statistics.frequency_distribution
-              .filter((item: FrequencyDistributionItem) => item && typeof item === 'object' && item.name)
+              .filter((item: FrequencyDistributionItem) => item && typeof item === 'object' && item.frequency)
               .map((item: FrequencyDistributionItem, index: number) => (
-              <div key={item.name || `freq-${index}`} className="bg-gray-50 rounded-lg p-4 text-center">
-                <p className="text-xl font-bold text-gray-900">{item.value || 0}</p>
+              <div key={item.frequency || `freq-${index}`} className="bg-gray-50 rounded-lg p-4 text-center">
+                <p className="text-xl font-bold text-gray-900">{item.count || 0}</p>
                 <p className="text-sm font-medium text-gray-500 capitalize">
-                  {formatFrequencyName(item.name)}
+                  {formatFrequencyName(item.frequency)}
                 </p>
               </div>
             ))}
@@ -279,7 +339,7 @@ export default function PreventiveMaintenanceDashboard() {
         </div>
       )}
 
-      {/* Average Completion Times - New section using avg_completion_times data */}
+      {/* Average Completion Times - Using avg_completion_times data */}
       {statistics.avg_completion_times && Object.keys(statistics.avg_completion_times).length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Average Completion Times</h2>
@@ -304,12 +364,28 @@ export default function PreventiveMaintenanceDashboard() {
         </div>
       )}
       
-      {/* Upcoming Maintenance */}
-      {statistics.upcoming && Array.isArray(statistics.upcoming) && statistics.upcoming.length > 0 && (
-        <div className="bg-white rounded-lg shadow mb-8">
-          <div className="px-6 py-4 border-b">
+      {/* Enhanced Upcoming Maintenance Section */}
+      <div className="bg-white rounded-lg shadow mb-8">
+        <div className="px-6 py-4 border-b">
+          <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-700">Upcoming Maintenance</h2>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500">
+                Next 7 days: {statistics.upcoming?.length || 0} tasks
+              </span>
+              {process.env.NODE_ENV === 'development' && (
+                <button 
+                  onClick={handleDebugClick}
+                  className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200"
+                >
+                  Debug
+                </button>
+              )}
+            </div>
           </div>
+        </div>
+        
+        {statistics.upcoming && Array.isArray(statistics.upcoming) && statistics.upcoming.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -421,8 +497,37 @@ export default function PreventiveMaintenanceDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="p-6 text-center">
+            <div className="text-gray-400 mb-2">
+              <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0V9a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V11a2 2 0 00-2-2v0" />
+              </svg>
+            </div>
+            <p className="text-gray-500 mb-2">No upcoming maintenance tasks in the next 7 days</p>
+            <p className="text-sm text-gray-400">This could mean:</p>
+            <ul className="text-sm text-gray-400 mt-1 list-disc list-inside">
+              <li>All tasks are completed</li>
+              <li>Tasks are scheduled beyond 7 days</li>
+              <li>No maintenance tasks exist yet</li>
+            </ul>
+            <div className="mt-4 space-x-2">
+              <Link 
+                href="/preventive-maintenance/create"
+                className="inline-block bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+              >
+                Create New Task
+              </Link>
+              <Link 
+                href="/preventive-maintenance"
+                className="inline-block bg-gray-100 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-200"
+              >
+                View All Tasks
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
       
       {/* Quick Access */}
       <div className="bg-white rounded-lg shadow p-6">
