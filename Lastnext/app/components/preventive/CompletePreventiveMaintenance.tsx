@@ -25,9 +25,16 @@ interface CompletePreventiveMaintenanceProps {
   };
 }
 
+// Interface for available records
+interface AvailableRecord {
+  id: string;
+  pm_id: string;
+  pmtitle?: string;
+  status?: string;
+}
+
 export default function CompletePreventiveMaintenance({ params }: CompletePreventiveMaintenanceProps) {
   const router = useRouter();
-  // FIXED: Use the actual ID from params (which should be 10, 11, or 12 based on your data)
   const pmId = params?.id;
   
   console.log('=== COMPONENT DEBUG ===');
@@ -38,23 +45,29 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
   // Use context for state management and actions
   const { 
     selectedMaintenance,
+    maintenanceItems,
     isLoading,
     error,
     fetchMaintenanceById,
+    fetchMaintenanceItems,
     completeMaintenance,
     clearError
   } = usePreventiveMaintenance();
 
-  // Local state - Updated to match the service's expected structure
+  // Local state
   const [completionData, setCompletionData] = useState<PreventiveMaintenanceCompleteRequest>({
-    completion_notes: '', // Fixed property name from 'notes' to 'completion_notes'
-    after_image: undefined, // Will be a File object if uploaded
+    completion_notes: '',
+    after_image: undefined,
   });
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [completedDate, setCompletedDate] = useState<string>(new Date().toISOString().slice(0, 16)); // Local state for date
+  const [completedDate, setCompletedDate] = useState<string>(new Date().toISOString().slice(0, 16));
   const [isMobile, setIsMobile] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  
+  // New state for available records
+  const [availableRecords, setAvailableRecords] = useState<AvailableRecord[]>([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(false);
 
   // Check if mobile
   useEffect(() => {
@@ -66,6 +79,52 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Fetch available records when there's an error
+  useEffect(() => {
+    if (error && !selectedMaintenance) {
+      fetchAvailableRecords();
+    }
+  }, [error, selectedMaintenance]);
+
+  // Update available records when maintenanceItems changes
+  useEffect(() => {
+    if (maintenanceItems && Array.isArray(maintenanceItems) && maintenanceItems.length > 0) {
+      const records = maintenanceItems.map((record: any) => ({
+        id: record.id?.toString() || '',
+        pm_id: record.pm_id || '',
+        pmtitle: record.pmtitle || 'Untitled Task',
+        status: record.completed_date ? 'Completed' : 'Pending'
+      }));
+      setAvailableRecords(records.slice(0, 10));
+    }
+  }, [maintenanceItems]);
+
+  // Function to fetch available records
+  const fetchAvailableRecords = async () => {
+    setIsLoadingRecords(true);
+    try {
+      // Use the existing fetchMaintenanceItems method from context
+      await fetchMaintenanceItems({ page: 1, page_size: 50 }); // Get more records for better overview
+      
+      // Use maintenanceItems from context to populate available records
+      if (maintenanceItems && Array.isArray(maintenanceItems)) {
+        const records = maintenanceItems.map((record: any) => ({
+          id: record.id?.toString() || '',
+          pm_id: record.pm_id || '',
+          pmtitle: record.pmtitle || 'Untitled Task',
+          status: record.completed_date ? 'Completed' : 'Pending'
+        }));
+        setAvailableRecords(records.slice(0, 10)); // Limit to first 10 records for display
+      }
+    } catch (err) {
+      console.error('Error fetching available records:', err);
+      // Fallback to empty array if fetch fails
+      setAvailableRecords([]);
+    } finally {
+      setIsLoadingRecords(false);
+    }
+  };
 
   // Fetch maintenance record
   useEffect(() => {
@@ -158,8 +217,6 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
     clearError();
     
     try {
-      // Note: The service should handle setting the completed_date
-      // We're not sending it as part of the completion data
       const result = await completeMaintenance(pmId, completionData);
       
       if (result) {
@@ -174,7 +231,6 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
       }
     } catch (err: any) {
       console.error('Error completing maintenance task:', err);
-      // Don't reset submitting state on error to let user retry
     } finally {
       setIsSubmitting(false);
     }
@@ -196,17 +252,14 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
   const getImageUrl = (image: MaintenanceImage | string | null | undefined): string | null => {
     if (!image) return null;
     
-    // First try to get direct URL property
     if (typeof image === 'object' && 'image_url' in image && image.image_url) {
       return image.image_url;
     }
     
-    // If no direct URL but we have an ID, construct URL
     if (typeof image === 'object' && 'id' in image && image.id) {
       return `/api/images/${image.id}`;
     }
     
-    // If image is just a string URL
     if (typeof image === 'string') {
       return image;
     }
@@ -265,19 +318,65 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
             <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-sm md:text-base font-medium">Error loading maintenance task</p>
-              <p className="text-xs mt-1">ID: {pmId}</p>
+              <p className="text-xs mt-1">Requested ID: {pmId}</p>
               <p className="text-xs mt-1">{error}</p>
-              <div className="mt-2 text-xs">
-                <p>Available record IDs from your database:</p>
-                <ul className="list-disc list-inside mt-1">
-                  <li>ID 10 (pm_id: pm2574B3CA)</li>
-                  <li>ID 11 (pm_id: pm255DCED2)</li>
-                  <li>ID 12 (pm_id: pm25CBE5CE)</li>
-                </ul>
-              </div>
             </div>
           </div>
-          <div className="mt-4 space-x-2">
+          
+          {/* Available Records Section */}
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-gray-900 mb-3">Available Records:</h3>
+            
+            {isLoadingRecords ? (
+              <div className="flex items-center text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Loading available records...
+              </div>
+            ) : availableRecords.length > 0 ? (
+              <div className="space-y-2">
+                {availableRecords.map((record) => (
+                  <div 
+                    key={record.id} 
+                    className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {record.pmtitle}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        ID: {record.id} | PM_ID: {record.pm_id}
+                      </p>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${
+                        record.status === 'Completed' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {record.status}
+                      </span>
+                    </div>
+                    <Link 
+                      href={`/preventive-maintenance/complete/${record.id}`}
+                      className="ml-3 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      {record.status === 'Completed' ? 'View' : 'Complete'}
+                    </Link>
+                  </div>
+                ))}
+                
+                {availableRecords.length === 10 && (
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    Showing first 10 records only
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500">
+                No maintenance records found in the database.
+              </div>
+            )}
+          </div>
+          
+          <div className="mt-6 flex flex-wrap gap-2">
             <Link 
               href="/preventive-maintenance" 
               className="inline-flex items-center bg-gray-100 py-2 px-4 rounded-lg text-gray-700 hover:bg-gray-200 text-sm"
@@ -285,25 +384,19 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to List
             </Link>
-            {/* Quick access to working records */}
-            <Link 
-              href="/preventive-maintenance/12" 
+            
+            <button
+              onClick={fetchAvailableRecords}
               className="inline-flex items-center bg-blue-100 py-2 px-4 rounded-lg text-blue-700 hover:bg-blue-200 text-sm"
+              disabled={isLoadingRecords}
             >
-              Try ID 12
-            </Link>
-            <Link 
-              href="/preventive-maintenance/11" 
-              className="inline-flex items-center bg-blue-100 py-2 px-4 rounded-lg text-blue-700 hover:bg-blue-200 text-sm"
-            >
-              Try ID 11
-            </Link>
-            <Link 
-              href="/preventive-maintenance/10" 
-              className="inline-flex items-center bg-blue-100 py-2 px-4 rounded-lg text-blue-700 hover:bg-blue-200 text-sm"
-            >
-              Try ID 10
-            </Link>
+              {isLoadingRecords ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <span>🔄</span>
+              )}
+              <span className="ml-1">Refresh Records</span>
+            </button>
           </div>
         </div>
       </div>
