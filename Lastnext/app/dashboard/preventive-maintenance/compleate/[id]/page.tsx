@@ -10,13 +10,19 @@ const CompletePreventiveMaintenance = dynamic(
   { ssr: false }
 );
 
-export default function CompletePreventiveMaintenancePage() {
+interface PageProps {
+  params: {
+    id: string;
+  };
+}
+
+export default function CompletePreventiveMaintenancePage({ params }: PageProps) {
   return (
     <div className="bg-gray-50 min-h-screen">
       <PreventiveMaintenanceProvider>
         <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
           <h1 className="text-2xl font-bold text-gray-900 mb-8">Complete Maintenance Dashboard</h1>
-          <CompletePreventiveMaintenance params={{ id: '1' }} />
+          <CompletePreventiveMaintenance params={params} />
         </div>
       </PreventiveMaintenanceProvider>
     </div>
