@@ -47,7 +47,8 @@ export interface Topic {
   export interface MachineDetails {
     machine_id: string;
     name: string;
-    id?: number; // Optional
+    id?: number; 
+    
   }
   // Preventive Maintenance main interface
   export interface PreventiveMaintenance {
