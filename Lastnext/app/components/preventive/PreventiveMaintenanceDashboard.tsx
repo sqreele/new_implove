@@ -126,7 +126,7 @@ export default function PreventiveMaintenanceDashboard() {
           {error}
         </div>
         <Link 
-          href="/preventive-maintenance" 
+          href="/dashboard/preventive-maintenance/" 
           className="bg-gray-100 py-2 px-4 rounded-md text-gray-700 hover:bg-gray-200"
         >
           View All Maintenance Tasks
