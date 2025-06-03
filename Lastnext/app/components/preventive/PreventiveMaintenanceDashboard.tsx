@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext'; // Fixed import path
 import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
 
-// Define interface for frequency distribution item
+// Define interface for frequency distribution item - Fixed to match actual data structure
 interface FrequencyDistributionItem {
-  name: string;
-  value: number;
+  name: string;  // Back to 'name' as per TypeScript error
+  value: number; // Back to 'value' as per TypeScript error
 }
 
 // Helper function to get image URL
@@ -61,12 +61,12 @@ const determinePMStatus = (item: PreventiveMaintenance): string => {
   return 'pending';
 };
 
-// Helper function to safely format frequency name
+// Helper function to safely format frequency name - Fixed parameter name
 const formatFrequencyName = (name: string | undefined | null): string => {
   if (!name || typeof name !== 'string') {
     return 'Unknown';
   }
-  return name.replace(/_/g, ' ');
+  return name.charAt(0).toUpperCase() + name.slice(1);
 };
 
 export default function PreventiveMaintenanceDashboard() {
@@ -260,13 +260,13 @@ export default function PreventiveMaintenanceDashboard() {
         </p>
       </div>
       
-      {/* Frequency Distribution - Fixed with null safety */}
+      {/* Frequency Distribution - Fixed to use name and value properties */}
       {statistics.frequency_distribution && Array.isArray(statistics.frequency_distribution) && statistics.frequency_distribution.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Maintenance Frequency Distribution</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {statistics.frequency_distribution
-              .filter((item: FrequencyDistributionItem) => item && typeof item === 'object')
+              .filter((item: FrequencyDistributionItem) => item && typeof item === 'object' && item.name)
               .map((item: FrequencyDistributionItem, index: number) => (
               <div key={item.name || `freq-${index}`} className="bg-gray-50 rounded-lg p-4 text-center">
                 <p className="text-xl font-bold text-gray-900">{item.value || 0}</p>
@@ -276,6 +276,31 @@ export default function PreventiveMaintenanceDashboard() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Average Completion Times - New section using avg_completion_times data */}
+      {statistics.avg_completion_times && Object.keys(statistics.avg_completion_times).length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">Average Completion Times</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Object.entries(statistics.avg_completion_times).map(([frequency, avgDays]) => (
+              <div key={frequency} className="bg-gray-50 rounded-lg p-4 text-center">
+                <p className="text-xl font-bold text-gray-900">
+                  {typeof avgDays === 'number' ? Math.round(avgDays) : 0} days
+                </p>
+                <p className="text-sm font-medium text-gray-500 capitalize">
+                  {formatFrequencyName(frequency)}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {typeof avgDays === 'number' && avgDays < 0 ? 'Early' : avgDays === 0 ? 'On Time' : 'Delayed'}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-4">
+            * Negative values indicate tasks completed early, positive values indicate delays
+          </p>
         </div>
       )}
       

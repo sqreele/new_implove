@@ -33,6 +33,7 @@ export interface CompletePreventiveMaintenanceData {
 }
 
 export interface DashboardStats {
+  avg_completion_times: boolean;
   counts: {
     total: number;
     completed: number;
