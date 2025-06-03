@@ -61,6 +61,14 @@ const determinePMStatus = (item: PreventiveMaintenance): string => {
   return 'pending';
 };
 
+// Helper function to safely format frequency name
+const formatFrequencyName = (name: string | undefined | null): string => {
+  if (!name || typeof name !== 'string') {
+    return 'Unknown';
+  }
+  return name.replace(/_/g, ' ');
+};
+
 export default function PreventiveMaintenanceDashboard() {
   // Use our context hook to access all maintenance data and actions
   const { 
@@ -252,16 +260,18 @@ export default function PreventiveMaintenanceDashboard() {
         </p>
       </div>
       
-      {/* Frequency Distribution - Updated to match the data structure */}
-      {statistics.frequency_distribution && statistics.frequency_distribution.length > 0 && (
+      {/* Frequency Distribution - Fixed with null safety */}
+      {statistics.frequency_distribution && Array.isArray(statistics.frequency_distribution) && statistics.frequency_distribution.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Maintenance Frequency Distribution</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {statistics.frequency_distribution.map((item: FrequencyDistributionItem) => (
-              <div key={item.name} className="bg-gray-50 rounded-lg p-4 text-center">
-                <p className="text-xl font-bold text-gray-900">{item.value}</p>
+            {statistics.frequency_distribution
+              .filter((item: FrequencyDistributionItem) => item && typeof item === 'object')
+              .map((item: FrequencyDistributionItem, index: number) => (
+              <div key={item.name || `freq-${index}`} className="bg-gray-50 rounded-lg p-4 text-center">
+                <p className="text-xl font-bold text-gray-900">{item.value || 0}</p>
                 <p className="text-sm font-medium text-gray-500 capitalize">
-                  {item.name.replace('_', ' ')}
+                  {formatFrequencyName(item.name)}
                 </p>
               </div>
             ))}
@@ -270,7 +280,7 @@ export default function PreventiveMaintenanceDashboard() {
       )}
       
       {/* Upcoming Maintenance */}
-      {statistics.upcoming && statistics.upcoming.length > 0 && (
+      {statistics.upcoming && Array.isArray(statistics.upcoming) && statistics.upcoming.length > 0 && (
         <div className="bg-white rounded-lg shadow mb-8">
           <div className="px-6 py-4 border-b">
             <h2 className="text-lg font-semibold text-gray-700">Upcoming Maintenance</h2>
@@ -303,7 +313,9 @@ export default function PreventiveMaintenanceDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {statistics.upcoming.map((item: PreventiveMaintenance) => {
+                {statistics.upcoming
+                  .filter((item: PreventiveMaintenance) => item && typeof item === 'object')
+                  .map((item: PreventiveMaintenance) => {
                   // Determine PM status
                   const status = item.status || determinePMStatus(item);
                   

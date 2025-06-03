@@ -67,6 +67,40 @@ export default function PreventiveMaintenanceListPage() {
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
+  // Helper function to safely get machine names
+  const getMachineNames = (machines: any) => {
+    if (!machines) return 'None';
+    
+    // If machines is an array
+    if (Array.isArray(machines)) {
+      if (machines.length === 0) return 'None';
+      
+      // Get names from each machine object
+      const names = machines
+        .map(machine => {
+          if (typeof machine === 'string') return machine;
+          if (typeof machine === 'object' && machine.name) return machine.name;
+          if (typeof machine === 'object' && machine.machine_name) return machine.machine_name;
+          return 'Unknown';
+        })
+        .filter(name => name !== 'Unknown');
+      
+      return names.length > 0 ? names.join(', ') : 'Unknown';
+    }
+    
+    // If machines is a single object
+    if (typeof machines === 'object') {
+      return machines.name || machines.machine_name || 'Unknown';
+    }
+    
+    // If machines is a string
+    if (typeof machines === 'string') {
+      return machines;
+    }
+    
+    return 'Unknown';
+  };
+
   // Check if mobile
   useEffect(() => {
     const checkMobile = () => {
@@ -634,10 +668,10 @@ export default function PreventiveMaintenanceListPage() {
                                     <span className="font-medium text-gray-500 w-16">Freq:</span>
                                     <span>{getFrequencyText(item.frequency)}</span>
                                   </div>
-                                  {item.machines && item.machines.length > 0 && (
+                                  {item.machines && (Array.isArray(item.machines) ? item.machines.length > 0 : item.machines) && (
                                     <div className="flex items-center">
                                       <span className="font-medium text-gray-500 w-16">Machines:</span>
-                                      <span>{item.machines.length}</span>
+                                      <span>{getMachineNames(item.machines)}</span>
                                     </div>
                                   )}
                                 </div>
@@ -684,9 +718,9 @@ export default function PreventiveMaintenanceListPage() {
                                   <span>
                                     Frequency: {getFrequencyText(item.frequency)}
                                   </span>
-                                  {item.machines && item.machines.length > 0 && (
+                                  {item.machines && (Array.isArray(item.machines) ? item.machines.length > 0 : item.machines) && (
                                     <span>
-                                      Machines: {item.machines.length}
+                                      Machines: {Array.isArray(item.machines) ? item.machines.length : 1} ({getMachineNames(item.machines)})
                                     </span>
                                   )}
                                 </div>
