@@ -50,8 +50,8 @@ const navItems = [
   { href: '/dashboard/createJob', label: 'Create Job', icon: PlusCircle },
   { href: '/dashboard/Preventive_maintenance', label: 'PM', icon: PlusCircle },
   { href: '/dashboard/preventive-maintenance/dashboard', label: 'PM Dashboard', icon:Package },
-  { href: '/dashboard/preventive-maintenance', label: 'PM List', icon: Settings },
-  { href: '/dashboard/preventive-maintenance/compleate', label: 'Completed PM', icon: Activity },
+  { href: '/dashboard/preventive-maintenance', label: 'PM List', icon:Activity },
+ 
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
