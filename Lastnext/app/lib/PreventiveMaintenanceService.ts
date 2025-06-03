@@ -33,7 +33,7 @@ export interface CompletePreventiveMaintenanceData {
 }
 
 export interface DashboardStats {
-  avg_completion_times: boolean;
+  avg_completion_times: Record<string, number>; 
   counts: {
     total: number;
     completed: number;
@@ -368,32 +368,34 @@ class PreventiveMaintenanceService {
     }
   }
 
-  async getMaintenanceStatistics(): Promise<ServiceResponse<DashboardStats>> {
-    try {
-      const response = await apiClient.get<DashboardStats>(`${this.baseUrl}/stats/`);
-      return { success: true, data: response.data, message: 'Statistics fetched successfully' };
-    } catch (error: any) {
-      console.error('Service error fetching maintenance statistics:', error);
-      
-      // Handle the case where no data exists (404 error)
-      if (error.status === 404 || (error.response && error.response.status === 404)) {
-        console.log('No maintenance data found, returning empty statistics');
-        const emptyStats: DashboardStats = {
-          counts: {
-            total: 0,
-            completed: 0,
-            pending: 0,
-            overdue: 0
-          },
-          frequency_distribution: [],
-          upcoming: []
-        };
-        return { success: true, data: emptyStats, message: 'No maintenance data found' };
-      }
-      
-      throw handleApiError(error);
+ // Updated getMaintenanceStatistics method to include avg_completion_times in empty stats
+async getMaintenanceStatistics(): Promise<ServiceResponse<DashboardStats>> {
+  try {
+    const response = await apiClient.get<DashboardStats>(`${this.baseUrl}/stats/`);
+    return { success: true, data: response.data, message: 'Statistics fetched successfully' };
+  } catch (error: any) {
+    console.error('Service error fetching maintenance statistics:', error);
+    
+    // Handle the case where no data exists (404 error)
+    if (error.status === 404 || (error.response && error.response.status === 404)) {
+      console.log('No maintenance data found, returning empty statistics');
+      const emptyStats: DashboardStats = {
+        counts: {
+          total: 0,
+          completed: 0,
+          pending: 0,
+          overdue: 0
+        },
+        frequency_distribution: [],
+        avg_completion_times: {}, // Added missing property as empty object
+        upcoming: []
+      };
+      return { success: true, data: emptyStats, message: 'No maintenance data found' };
     }
+    
+    throw handleApiError(error);
   }
+}
 
   // Updated delete method to use Next.js API route instead of direct Django call
 // Fixed delete method that uses apiClient for proper authentication
