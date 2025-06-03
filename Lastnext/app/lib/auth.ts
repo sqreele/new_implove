@@ -1,230 +1,128 @@
-import NextAuth from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import jwt, { JwtPayload } from "jsonwebtoken";
-import { NextAuthOptions } from "next-auth";
-import { prisma } from "@/app/lib/prisma";
-import { UserProfile, Property } from "@/app/lib/types"; // Import your types
-import { getUserProperties } from "./prisma-user-property";
-import { refreshAccessToken } from "./auth-helpers";
+// middleware.ts
+import { withAuth } from "next-auth/middleware";
+import { NextResponse, NextRequest } from 'next/server';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "https://pmcs.site");
+// Constants for better maintainability
+const SIGN_IN_PATH = '/auth/signin';
+const ERROR_TYPES = {
+  SESSION_EXPIRED: 'session_expired',
+  ACCESS_DENIED: 'access_denied'
+} as const;
 
-export const authOptions: NextAuthOptions = {
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        username: { label: "Username", type: "text" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.username || !credentials?.password) {
-          throw new Error("Missing credentials.");
+// Helper function to create redirect URL with proper error handling
+function createSignInRedirect(req: NextRequest, error?: string): NextResponse {
+  const signInUrl = new URL(SIGN_IN_PATH, req.url);
+  
+  if (error) {
+    signInUrl.searchParams.set('error', error);
+  }
+  
+  // Preserve the original URL for post-login redirect
+  signInUrl.searchParams.set('callbackUrl', encodeURIComponent(req.url));
+  
+  return NextResponse.redirect(signInUrl);
+}
+
+export default withAuth(
+  function middleware(req) {
+    const token = req.nextauth.token;
+    
+    // Handle various token error states
+    if (token?.error) {
+      switch (token.error) {
+        case 'RefreshAccessTokenError':
+          return createSignInRedirect(req, ERROR_TYPES.SESSION_EXPIRED);
+        
+        case 'OAuthAccountNotLinked':
+        case 'AccessDenied':
+          return createSignInRedirect(req, ERROR_TYPES.ACCESS_DENIED);
+        
+        default:
+          // Log unknown errors for debugging (consider using proper logging service)
+          console.warn('Unknown token error:', token.error);
+          return createSignInRedirect(req, ERROR_TYPES.SESSION_EXPIRED);
+      }
+    }
+    
+    // Optional: Add role-based access control
+    // Example: Restrict admin routes to admin users
+    if (req.nextUrl.pathname.startsWith('/admin') && token?.role !== 'admin') {
+      return createSignInRedirect(req, ERROR_TYPES.ACCESS_DENIED);
+    }
+    
+    // Optional: Add session expiry check
+    if (token?.exp && Date.now() >= token.exp * 1000) {
+      return createSignInRedirect(req, ERROR_TYPES.SESSION_EXPIRED);
+    }
+    
+    // Add security headers
+    const response = NextResponse.next();
+    
+    // Prevent embedding in frames (clickjacking protection)
+    response.headers.set('X-Frame-Options', 'DENY');
+    
+    // XSS protection
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    
+    // Add user info to headers for easier access in components (optional)
+    if (token?.sub) {
+      response.headers.set('X-User-ID', token.sub);
+    }
+    
+    return response;
+  },
+  {
+    callbacks: {
+      // More robust authorization check
+      authorized: ({ token, req }) => {
+        // Allow access if token exists and is not expired
+        if (!token) return false;
+        
+        // Check for token errors
+        if (token.error) return false;
+        
+        // Optional: Additional authorization logic
+        // Example: Check if user has required permissions for specific routes
+        const pathname = req.nextUrl.pathname;
+        
+        if (pathname.startsWith('/admin') && token.role !== 'admin') {
+          return false;
         }
-
-        try {
-          /** 🔹 Step 1: Get authentication tokens from API */
-          const tokenResponse = await fetch(`${API_BASE_URL}/api/token/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(credentials),
-          });
-
-          if (!tokenResponse.ok) {
-            const errorText = await tokenResponse.text();
-            console.error(`Token fetch failed: ${tokenResponse.status} - ${errorText}`);
-            throw new Error("Invalid credentials.");
-          }
-
-          const tokenData = await tokenResponse.json();
-          if (!tokenData.access || !tokenData.refresh) {
-            throw new Error("Token response missing access or refresh token.");
-          }
-
-          /** 🔹 Step 2: Decode JWT token to get user ID and expiry */
-          const decoded = jwt.decode(tokenData.access) as JwtPayload;
-          if (!decoded || typeof decoded !== "object" || !decoded.user_id) {
-            throw new Error("Failed to decode access token.");
-          }
-
-          const userId = String(decoded.user_id);
-          // Calculate token expiry time
-          const accessTokenExpires = decoded.exp ? decoded.exp * 1000 : Date.now() + 60 * 60 * 1000;
-
-          /** 🔹 Step 3: Fetch user from Prisma database */
-          let user = await prisma.user.findUnique({
-            where: { id: userId },
-          });
-
-          /** 🔹 Step 4: Fetch user profile from API */
-          let profileData: Partial<UserProfile> = {}; // Use Partial<UserProfile> since not all fields might be present
-          const profileResponse = await fetch(`${API_BASE_URL}/api/user-profiles/${userId}/`, {
-            headers: { Authorization: `Bearer ${tokenData.access}`, "Content-Type": "application/json" },
-          });
-
-          if (profileResponse.ok) {
-            profileData = await profileResponse.json();
-          } else {
-            console.error(`Profile fetch failed: ${profileResponse.status}`);
-          }
-
-          /** 🔹 Step 5: Create or update user in Prisma */
-          if (!user) {
-            user = await prisma.user.upsert({
-              where: { id: userId },
-              update: {
-                username: credentials.username,
-                email: profileData.email || null,
-                profile_image: profileData.profile_image || null,
-                positions: profileData.positions || "User",
-                created_at: profileData.created_at ? new Date(profileData.created_at) : new Date(),
-              },
-              create: {
-                id: userId,
-                username: credentials.username,
-                email: profileData.email || null,
-                profile_image: profileData.profile_image || null,
-                positions: profileData.positions || "User",
-                created_at: profileData.created_at ? new Date(profileData.created_at) : new Date(),
-              },
-            });
-          }
-
-          /** 🔹 Step 6: Normalize properties */
-          let normalizedProperties: Property[] = [];
-          
-          if (profileData.properties && profileData.properties.length > 0) {
-            normalizedProperties = profileData.properties.map((prop: any) => ({
-              id: String(prop.id),
-              property_id: String(prop.property_id || prop.id),
-              name: prop.name || `Property ${prop.id}`,
-              description: prop.description || "",
-              created_at: prop.created_at || new Date().toISOString(),
-              users: prop.users || [],
-            }));
-          } else {
-            try {
-              normalizedProperties = await getUserProperties(userId);
-            } catch (error) {
-              console.error("Failed to get properties:", error);
-              normalizedProperties = [];
-            }
-          }
-
-          /** 🔹 Step 7: Construct user profile */
-          const userProfile: UserProfile = {
-            id: userId,
-            username: credentials.username,
-            email: user.email || profileData.email || null,
-            profile_image: user.profile_image || profileData.profile_image || null,
-            positions: user.positions || profileData.positions || "User",
-            properties: normalizedProperties,
-            created_at: user.created_at.toISOString() || profileData.created_at || new Date().toISOString(),
-           
-          };
-
-          /** 🔹 Step 8: Return the user object with token expiry time */
-          return {
-            ...userProfile,
-            accessToken: tokenData.access,
-            refreshToken: tokenData.refresh,
-            accessTokenExpires: accessTokenExpires,
-          };
-        } catch (error) {
-          console.error("Authorization Error:", error);
-          throw new Error("Unable to log in. Please check your credentials.");
-        }
+        
+        return true;
       },
-    }),
+    },
+    pages: {
+      signIn: SIGN_IN_PATH,
+      error: '/auth/error', // Custom error page
+    },
+  }
+);
+
+// Improved matcher with more specific patterns
+export const config = {
+  matcher: [
+    // Protected dashboard routes
+    '/dashboard/:path*',
+    '/profile/:path*',
+    
+    // Admin routes (if you have them)
+    '/admin/:path*',
+    
+    // API routes that need authentication
+    '/api/user/:path*',
+    '/api/protected/:path*',
+    
+    // Exclude static files and public routes
+    '/((?!api/auth|_next/static|_next/image|favicon.ico|public|auth/signin|auth/error).*)',
   ],
-
-  callbacks: {
-    async jwt({ token, user, account }) {
-      // Initial sign in
-      if (user) {
-        token.id = user.id;
-        token.username = user.username;
-        token.email = user.email;
-        token.profile_image = user.profile_image;
-        token.positions = user.positions;
-        token.properties = Array.isArray(user.properties) ? user.properties : [];
-        token.created_at = user.created_at;
-        token.accessToken = user.accessToken;
-        token.refreshToken = user.refreshToken;
-        token.accessTokenExpires = user.accessTokenExpires;
-      }
-
-      // Return previous token if the access token has not expired yet
-      if (Date.now() < (token.accessTokenExpires as number)) {
-        return token;
-      }
-
-      // Access token has expired, try to update it
-      try {
-        console.log("Access token has expired. Attempting refresh...");
-        const refreshedToken = await refreshAccessToken(token.refreshToken as string);
-        
-        if (refreshedToken.error) {
-          console.error("Error refreshing token:", refreshedToken.error);
-          return { ...token, error: "RefreshAccessTokenError" };
-        }
-        
-        console.log("Token refreshed successfully");
-        return {
-          ...token,
-          accessToken: refreshedToken.accessToken,
-          refreshToken: refreshedToken.refreshToken || token.refreshToken,
-          accessTokenExpires: refreshedToken.accessTokenExpires,
-        };
-      } catch (error) {
-        console.error("Token refresh error:", error);
-        return { ...token, error: "RefreshAccessTokenError" };
-      }
-    },
-
-    async session({ session, token }) {
-      session.user = {
-        id: token.id as string,
-        username: token.username as string,
-        email: token.email as string | null,
-        profile_image: token.profile_image as string | null,
-        positions: token.positions as string,
-        properties: token.properties as Property[],
-        created_at: token.created_at as string,
-        accessToken: token.accessToken as string,
-        refreshToken: token.refreshToken as string,
-      };
-      
-      // Pass error to the session if token refresh failed
-      if (token.error) {
-        session.error = token.error as string;
-      }
-      
-      return session;
-    },
-  },
-
-  events: {
-    async signIn({ user }) {
-      console.log(`User ${user.id} signed in successfully`);
-    },
-    async session({ session, token }) {
-      if (token.error === "RefreshAccessTokenError") {
-        console.error(`Session error: Failed to refresh access token`);
-      }
-    },
-  },
-
-  pages: { signIn: "/auth/signin" },
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-    updateAge: 24 * 60 * 60, // Refresh every 24 hours
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV !== "production",
 };
 
-export default NextAuth(authOptions);
+// Optional: Export types for better TypeScript support
+export interface ExtendedToken {
+  sub?: string;
+  email?: string;
+  role?: string;
+  exp?: number;
+  error?: string;
+}
