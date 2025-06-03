@@ -1,9 +1,10 @@
+// lib/auth.ts (or wherever your auth config is)
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { NextAuthOptions } from "next-auth";
 import { prisma } from "@/app/lib/prisma";
-import { UserProfile, Property } from "@/app/lib/types"; // Import your types
+import { UserProfile, Property } from "@/app/lib/types";
 import { getUserProperties } from "./prisma-user-property";
 import { refreshAccessToken } from "./auth-helpers";
 
@@ -50,7 +51,6 @@ export const authOptions: NextAuthOptions = {
           }
 
           const userId = String(decoded.user_id);
-          // Calculate token expiry time
           const accessTokenExpires = decoded.exp ? decoded.exp * 1000 : Date.now() + 60 * 60 * 1000;
 
           /** 🔹 Step 3: Fetch user from Prisma database */
@@ -59,7 +59,7 @@ export const authOptions: NextAuthOptions = {
           });
 
           /** 🔹 Step 4: Fetch user profile from API */
-          let profileData: Partial<UserProfile> = {}; // Use Partial<UserProfile> since not all fields might be present
+          let profileData: Partial<UserProfile> = {};
           const profileResponse = await fetch(`${API_BASE_URL}/api/user-profiles/${userId}/`, {
             headers: { Authorization: `Bearer ${tokenData.access}`, "Content-Type": "application/json" },
           });
@@ -122,7 +122,6 @@ export const authOptions: NextAuthOptions = {
             positions: user.positions || profileData.positions || "User",
             properties: normalizedProperties,
             created_at: user.created_at.toISOString() || profileData.created_at || new Date().toISOString(),
-           
           };
 
           /** 🔹 Step 8: Return the user object with token expiry time */
@@ -226,5 +225,6 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV !== "production",
 };
-
-export default NextAuth(authOptions);
+export default authOptions;
+// REMOVED: Don't export NextAuth(authOptions) as default
+// export default NextAuth(authOptions);
