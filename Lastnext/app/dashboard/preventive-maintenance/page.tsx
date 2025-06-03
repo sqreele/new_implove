@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext';
 import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
+import PDFMaintenanceGenerator from '@/app/components/ducument/Prevertivemaintenancepdf'
 import { 
   Calendar, 
   Search, 
@@ -23,7 +24,8 @@ import {
   Settings,
   X,
   MoreVertical,
-  Menu
+  Menu,
+  FileText
 } from 'lucide-react';
 
 interface FilterState {
@@ -353,6 +355,14 @@ export default function PreventiveMaintenanceListPage() {
               <Plus className="h-4 w-4 mr-2" />
               New Maintenance
             </Link>
+            
+            <button
+              onClick={PDFMaintenanceGenerator}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Generate PDF
+            </button>
           </div>
         </div>
       </div>
