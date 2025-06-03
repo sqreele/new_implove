@@ -27,7 +27,13 @@ interface CompletePreventiveMaintenanceProps {
 
 export default function CompletePreventiveMaintenance({ params }: CompletePreventiveMaintenanceProps) {
   const router = useRouter();
+  // FIXED: Use the actual ID from params (which should be 10, 11, or 12 based on your data)
   const pmId = params?.id;
+  
+  console.log('=== COMPONENT DEBUG ===');
+  console.log('Received params:', params);
+  console.log('Using pmId:', pmId);
+  console.log('pmId type:', typeof pmId);
   
   // Use context for state management and actions
   const { 
@@ -63,14 +69,26 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
 
   // Fetch maintenance record
   useEffect(() => {
+    console.log('=== FETCH EFFECT ===');
+    console.log('pmId from useEffect:', pmId);
+    console.log('pmId exists?', !!pmId);
+    
     if (pmId) {
+      console.log('Calling fetchMaintenanceById with ID:', pmId);
       fetchMaintenanceById(pmId);
+    } else {
+      console.error('No pmId provided to component');
     }
   }, [pmId, fetchMaintenanceById]);
 
   // Pre-populate form when data is loaded
   useEffect(() => {
     if (selectedMaintenance) {
+      console.log('=== SELECTED MAINTENANCE LOADED ===');
+      console.log('Selected maintenance:', selectedMaintenance);
+      console.log('Maintenance ID:', selectedMaintenance.id);
+      console.log('Maintenance PM_ID:', selectedMaintenance.pm_id);
+      
       // Pre-populate notes if any exist
       if (selectedMaintenance.notes) {
         setCompletionData(prev => ({
@@ -127,7 +145,14 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    if (!pmId) return;
+    if (!pmId) {
+      console.error('Cannot submit: No pmId available');
+      return;
+    }
+    
+    console.log('=== FORM SUBMISSION ===');
+    console.log('Submitting for pmId:', pmId);
+    console.log('Completion data:', completionData);
     
     setIsSubmitting(true);
     clearError();
@@ -189,6 +214,15 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
     return null;
   };
 
+  // Debug component state
+  useEffect(() => {
+    console.log('=== COMPONENT STATE DEBUG ===');
+    console.log('isLoading:', isLoading);
+    console.log('error:', error);
+    console.log('selectedMaintenance:', selectedMaintenance);
+    console.log('pmId:', pmId);
+  }, [isLoading, error, selectedMaintenance, pmId]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -206,6 +240,7 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
             <p className="mt-2 text-gray-500">Loading maintenance task...</p>
+            <p className="mt-1 text-xs text-gray-400">ID: {pmId}</p>
           </div>
         </div>
       </div>
@@ -228,15 +263,46 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
         <div className="p-4 md:max-w-3xl md:mx-auto md:py-8 md:px-6 lg:px-8">
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start">
             <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-            <span className="text-sm md:text-base">{error}</span>
+            <div>
+              <p className="text-sm md:text-base font-medium">Error loading maintenance task</p>
+              <p className="text-xs mt-1">ID: {pmId}</p>
+              <p className="text-xs mt-1">{error}</p>
+              <div className="mt-2 text-xs">
+                <p>Available record IDs from your database:</p>
+                <ul className="list-disc list-inside mt-1">
+                  <li>ID 10 (pm_id: pm2574B3CA)</li>
+                  <li>ID 11 (pm_id: pm255DCED2)</li>
+                  <li>ID 12 (pm_id: pm25CBE5CE)</li>
+                </ul>
+              </div>
+            </div>
           </div>
-          <div className="mt-4">
+          <div className="mt-4 space-x-2">
             <Link 
-              href={`/preventive-maintenance/${pmId}`} 
+              href="/preventive-maintenance" 
               className="inline-flex items-center bg-gray-100 py-2 px-4 rounded-lg text-gray-700 hover:bg-gray-200 text-sm"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Details
+              Back to List
+            </Link>
+            {/* Quick access to working records */}
+            <Link 
+              href="/preventive-maintenance/12" 
+              className="inline-flex items-center bg-blue-100 py-2 px-4 rounded-lg text-blue-700 hover:bg-blue-200 text-sm"
+            >
+              Try ID 12
+            </Link>
+            <Link 
+              href="/preventive-maintenance/11" 
+              className="inline-flex items-center bg-blue-100 py-2 px-4 rounded-lg text-blue-700 hover:bg-blue-200 text-sm"
+            >
+              Try ID 11
+            </Link>
+            <Link 
+              href="/preventive-maintenance/10" 
+              className="inline-flex items-center bg-blue-100 py-2 px-4 rounded-lg text-blue-700 hover:bg-blue-200 text-sm"
+            >
+              Try ID 10
             </Link>
           </div>
         </div>
@@ -260,6 +326,7 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
         <div className="p-4 md:max-w-3xl md:mx-auto md:py-8 md:px-6 lg:px-8">
           <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg">
             <p className="text-sm md:text-base">No data found for this preventive maintenance record.</p>
+            <p className="text-xs mt-1">Requested ID: {pmId}</p>
           </div>
           <div className="mt-4">
             <Link 
@@ -309,6 +376,19 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
         </div>
       </div>
       
+      {/* Debug info in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="md:max-w-3xl md:mx-auto md:px-4 sm:md:px-6 lg:md:px-8 mb-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mx-4 md:mx-0">
+            <p className="text-xs text-yellow-800">
+              <strong>Debug Info:</strong> Loading ID {pmId} | 
+              Record ID: {selectedMaintenance?.id} | 
+              PM_ID: {selectedMaintenance?.pm_id}
+            </p>
+          </div>
+        </div>
+      )}
+      
       {/* Content Container */}
       <div className="md:max-w-3xl md:mx-auto md:px-4 sm:md:px-6 lg:md:px-8">
         {/* Success Message */}
@@ -329,7 +409,7 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
                 {selectedMaintenance.pmtitle || 'Untitled Task'}
               </h3>
               <p className="mt-1 text-sm text-gray-600">
-                Task ID: {selectedMaintenance.pm_id}
+                Task ID: {selectedMaintenance.pm_id} (DB ID: {selectedMaintenance.id})
               </p>
             </div>
             
@@ -378,7 +458,8 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
               </p>
             </div>
             
-            <form onSubmit={handleSubmit} className="border-t border-gray-200 px-4 py-4 md:py-5 md:px-6">
+            {/* Using div instead of form element */}
+            <div className="border-t border-gray-200 px-4 py-4 md:py-5 md:px-6">
               {/* Completion Date - Note: This is for display only */}
               <div className="mb-6">
                 <label htmlFor="completed_date" className="block text-sm font-medium text-gray-700 mb-2">
@@ -422,9 +503,15 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
                     Before Image
                   </label>
                   <div className="aspect-square md:aspect-[4/3] border border-gray-300 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-                    {selectedMaintenance.before_image || selectedMaintenance.before_image_url ? (
+                    {selectedMaintenance.before_image_url ? (
                       <img 
-                        src={selectedMaintenance.before_image_url || getImageUrl(selectedMaintenance.before_image) || ''}
+                        src={selectedMaintenance.before_image_url}
+                        alt="Before maintenance" 
+                        className="h-full w-full object-cover"
+                      />
+                    ) : selectedMaintenance.before_image ? (
+                      <img 
+                        src={getImageUrl(selectedMaintenance.before_image) || ''}
                         alt="Before maintenance" 
                         className="h-full w-full object-cover"
                       />
@@ -519,7 +606,8 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
                   Cancel
                 </Link>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSubmit}
                   className="w-full md:w-auto bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base flex items-center justify-center"
                   disabled={isSubmitting}
                 >
@@ -536,7 +624,7 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
                   )}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         )}
         

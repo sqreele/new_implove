@@ -51,6 +51,7 @@ export interface Topic {
   }
   // Preventive Maintenance main interface
   export interface PreventiveMaintenance {
+    id?: number;
     pm_id: string;
     pmtitle?: string;
     machine_id?: string; // Optional, may be missing
