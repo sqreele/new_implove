@@ -356,13 +356,13 @@ export default function PreventiveMaintenanceListPage() {
               New Maintenance
             </Link>
             
-            <button
-              onClick={PDFMaintenanceGenerator}
+            <Link
+              href="/dashboard/preventive-maintenance/generate-report"
               className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               <FileText className="h-4 w-4 mr-2" />
               Generate PDF
-            </button>
+            </Link>
           </div>
         </div>
       </div>
