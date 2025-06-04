@@ -1,5 +1,4 @@
-// Update your PDFMaintenanceGenerator component to accept initial filters
-
+//app/components/ducument/prevertivemaintenancepdf.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   FileText, 
@@ -23,21 +22,12 @@ import {
   getImageUrl 
 } from '@/app/lib/preventiveMaintenanceModels';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext';
+import { FilterState } from '@/app/lib/FilterContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-interface InitialFilters {
-  status: string;
-  frequency: string;
-  search: string;
-  startDate: string;
-  endDate: string;
-  page: number;
-  pageSize: number;
-}
-
 interface PDFMaintenanceGeneratorProps {
-  initialFilters?: InitialFilters;
+  initialFilters?: FilterState;
 }
 
 const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({ 
@@ -49,7 +39,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   const { maintenanceItems, fetchMaintenanceItems } = usePreventiveMaintenance();
   const maintenanceData = maintenanceItems || [];
   
-  // Initialize filters with URL parameters or defaults
+  // Initialize filters with context values or defaults
   const [filterStatus, setFilterStatus] = useState(initialFilters?.status || 'all');
   const [filterFrequency, setFilterFrequency] = useState(initialFilters?.frequency || 'all');
   const [dateRange, setDateRange] = useState({ 
@@ -84,7 +74,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     loadData();
   }, [initialFilters, fetchMaintenanceItems]);
 
-  // Helper functions (same as before)
+  // Helper functions using the proper type definitions
   const getTaskStatus = (item: PreventiveMaintenance) => {
     return determinePMStatus(item);
   };
@@ -92,10 +82,12 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   const getTopicsString = (topics: Topic[] | number[] | null | undefined) => {
     if (!topics || topics.length === 0) return 'No topics';
     
+    // Handle both Topic objects and topic IDs
     if (typeof topics[0] === 'object' && 'title' in topics[0]) {
       return (topics as Topic[]).map(topic => topic.title).join(', ');
     }
     
+    // If we just have IDs, show the IDs
     return (topics as number[]).join(', ');
   };
 
@@ -103,10 +95,13 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     if (!machines || machines.length === 0) return 'No machines assigned';
     
     return machines.map(machine => {
+      // Handle string machine IDs
       if (typeof machine === 'string') {
         return machine;
       }
       
+      // Handle MachineDetails objects
+      // Note: API includes location but type doesn't, so we use any for location access
       const machineWithLocation = machine as any;
       const name = machine.name || machine.machine_id;
       const location = machineWithLocation.location ? ` (${machineWithLocation.location})` : '';
@@ -123,6 +118,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
         return firstMachine;
       }
       
+      // Access location property (exists in API but not in type)
       const machineWithLocation = firstMachine as any;
       return machineWithLocation.location || firstMachine.machine_id || 'Unknown';
     }
@@ -195,7 +191,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     window.print();
   };
 
-  // Download as HTML file
+  // Download as HTML file (alternative to PDF)
   const downloadHTML = () => {
     const htmlContent = document.getElementById('pdf-content')?.outerHTML;
     if (!htmlContent) return;
@@ -272,6 +268,15 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  // Check if any filters are active
+  const hasActiveFilters = initialFilters && [
+    initialFilters.status,
+    initialFilters.frequency,
+    initialFilters.search,
+    initialFilters.startDate,
+    initialFilters.endDate
+  ].some(filter => filter !== '');
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -317,16 +322,16 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
           </div>
         </div>
 
-        {/* Show applied filters */}
-        {initialFilters && (
+        {/* Show applied filters from context */}
+        {hasActiveFilters && (
           <div className="mb-6 p-4 bg-blue-50 rounded-lg">
             <h3 className="font-medium text-blue-900 mb-2">Applied Filters from Main Page:</h3>
             <div className="text-sm text-blue-800 space-y-1">
-              {initialFilters.status && <div>Status: <span className="font-medium capitalize">{initialFilters.status}</span></div>}
-              {initialFilters.frequency && <div>Frequency: <span className="font-medium capitalize">{initialFilters.frequency}</span></div>}
-              {initialFilters.search && <div>Search: <span className="font-medium">"{initialFilters.search}"</span></div>}
-              {initialFilters.startDate && <div>Start Date: <span className="font-medium">{initialFilters.startDate}</span></div>}
-              {initialFilters.endDate && <div>End Date: <span className="font-medium">{initialFilters.endDate}</span></div>}
+              {initialFilters!.status && <div>Status: <span className="font-medium capitalize">{initialFilters!.status}</span></div>}
+              {initialFilters!.frequency && <div>Frequency: <span className="font-medium capitalize">{initialFilters!.frequency}</span></div>}
+              {initialFilters!.search && <div>Search: <span className="font-medium">"{initialFilters!.search}"</span></div>}
+              {initialFilters!.startDate && <div>Start Date: <span className="font-medium">{initialFilters!.startDate}</span></div>}
+              {initialFilters!.endDate && <div>End Date: <span className="font-medium">{initialFilters!.endDate}</span></div>}
             </div>
           </div>
         )}
@@ -384,6 +389,18 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
           </div>
         </div>
 
+        {/* Search Override */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Override Search Term</label>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search maintenance tasks..."
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
         {/* Options */}
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center">
@@ -425,7 +442,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
         </div>
       </div>
 
-      {/* PDF Content - Same as your existing PDF content but using filteredData */}
+      {/* PDF Content */}
       <div id="pdf-content" ref={printRef} className="bg-white">
         {/* Header */}
         <div className="header text-center mb-8 border-b-2 border-gray-300 pb-6">
@@ -475,9 +492,6 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
           </div>
         </div>
 
-        {/* Rest of your existing PDF content using filteredData instead of maintenanceData */}
-        {/* ... (keeping the existing table and detailed sections the same, just replace maintenanceData with filteredData) ... */}
-        
         {/* Maintenance Tasks Table */}
         {filteredData.length > 0 && (
           <div className="mb-8">
@@ -522,6 +536,137 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Detailed Task Descriptions */}
+        {includeDetails && filteredData.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <FileText className="h-5 w-5 mr-2" />
+              Detailed Task Descriptions
+            </h2>
+            
+            {filteredData.map((item) => (
+              <div key={item.id} className="maintenance-item border border-gray-300 rounded-lg p-4 mb-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {item.pmtitle || 'No title'}
+                    </h3>
+                    <p className="text-sm text-gray-600">ID: {item.pm_id}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item)}`}>
+                      {getTaskStatus(item).toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+                
+                {(item as any).job_description && (
+                  <p className="text-gray-700 mb-3">{(item as any).job_description}</p>
+                )}
+                
+                {item.notes && (
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-600">Notes:</span>
+                    <p className="text-gray-700 mt-1">{item.notes}</p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                  <div>
+                    <span className="font-medium text-gray-600">Scheduled:</span>
+                    <p>{formatDate(item.scheduled_date)}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600">Frequency:</span>
+                    <p className={`capitalize font-medium ${getFrequencyColor(item.frequency)}`}>
+                      {item.frequency}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600">Topics:</span>
+                    <p>{getTopicsString(item.topics)}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600">Next Due:</span>
+                    <p>{item.next_due_date ? formatDate(item.next_due_date) : 'N/A'}</p>
+                  </div>
+                </div>
+
+                {item.machines && item.machines.length > 0 && (
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-600">Machines:</span>
+                    <p className="text-gray-700 mt-1">{getMachinesString(item.machines)}</p>
+                  </div>
+                )}
+
+                {item.property_id && (
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-600">Property ID:</span>
+                    <p className="text-gray-700 mt-1">{item.property_id}</p>
+                  </div>
+                )}
+                
+                {item.completed_date && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <span className="font-medium text-green-600">
+                      Completed on: {formatDate(item.completed_date)}
+                    </span>
+                  </div>
+                )}
+
+                {includeImages && (item.before_image_url || item.after_image_url || item.before_image || item.after_image) && (
+                  <div className="mt-4 pt-3 border-t border-gray-200">
+                    <h4 className="font-medium text-gray-700 mb-3 flex items-center">
+                      <Camera className="h-4 w-4 mr-2" />
+                      Images
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(item.before_image_url || getImageUrl(item.before_image)) && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-600 block mb-2">Before:</span>
+                          <img 
+                            src={item.before_image_url || getImageUrl(item.before_image) || ''} 
+                            alt="Before maintenance" 
+                            className="w-full h-48 object-cover rounded-lg border border-gray-300"
+                            onError={(e: any) => {
+                              e.target.style.display = 'none';
+                              if (e.target.nextSibling) {
+                                e.target.nextSibling.style.display = 'block';
+                              }
+                            }}
+                          />
+                          <div className="hidden w-full h-48 bg-gray-100 rounded-lg border border-gray-300 flex items-center justify-center">
+                            <span className="text-gray-500 text-sm">Image unavailable</span>
+                          </div>
+                        </div>
+                      )}
+                      {(item.after_image_url || getImageUrl(item.after_image)) && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-600 block mb-2">After:</span>
+                          <img 
+                            src={item.after_image_url || getImageUrl(item.after_image) || ''} 
+                            alt="After maintenance" 
+                            className="w-full h-48 object-cover rounded-lg border border-gray-300"
+                            onError={(e: any) => {
+                              e.target.style.display = 'none';
+                              if (e.target.nextSibling) {
+                                e.target.nextSibling.style.display = 'block';
+                              }
+                            }}
+                          />
+                          <div className="hidden w-full h-48 bg-gray-100 rounded-lg border border-gray-300 flex items-center justify-center">
+                            <span className="text-gray-500 text-sm">Image unavailable</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 

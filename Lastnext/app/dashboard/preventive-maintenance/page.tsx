@@ -1,12 +1,12 @@
 // app/dashboard/preventive-maintenance/page.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext';
+import { useFilters } from '@/app/lib/FilterContext';
 import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
-import PDFMaintenanceGenerator from '@/app/components/ducument/ PDFMaintenanceGenerator'
 import { 
   Calendar, 
   Search, 
@@ -20,24 +20,16 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
-  ArrowUpDown,
   Settings,
   X,
   MoreVertical,
-  Menu,
   FileText
 } from 'lucide-react';
 
-interface FilterState {
-  status: string;
-  frequency: string;
-  search: string;
-  startDate: string;
-  endDate: string;
-}
-
 export default function PreventiveMaintenanceListPage() {
   const router = useRouter();
+  const { currentFilters, updateFilter, clearFilters } = useFilters();
+  
   const {
     maintenanceItems,
     totalCount,
@@ -50,58 +42,12 @@ export default function PreventiveMaintenanceListPage() {
     clearError
   } = usePreventiveMaintenance();
 
-  // Local state for filters and UI
-  const [filters, setFilters] = useState<FilterState>({
-    status: '',
-    frequency: '',
-    search: '',
-    startDate: '',
-    endDate: ''
-  });
-  
+  // UI state
   const [showFilters, setShowFilters] = useState(false);
-  const [sortField, setSortField] = useState<string>('scheduled_date');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-
-  // Helper function to safely get machine names
-  const getMachineNames = (machines: any) => {
-    if (!machines) return 'None';
-    
-    // If machines is an array
-    if (Array.isArray(machines)) {
-      if (machines.length === 0) return 'None';
-      
-      // Get names from each machine object
-      const names = machines
-        .map(machine => {
-          if (typeof machine === 'string') return machine;
-          if (typeof machine === 'object' && machine.name) return machine.name;
-          if (typeof machine === 'object' && machine.machine_name) return machine.machine_name;
-          return 'Unknown';
-        })
-        .filter(name => name !== 'Unknown');
-      
-      return names.length > 0 ? names.join(', ') : 'Unknown';
-    }
-    
-    // If machines is a single object
-    if (typeof machines === 'object') {
-      return machines.name || machines.machine_name || 'Unknown';
-    }
-    
-    // If machines is a string
-    if (typeof machines === 'string') {
-      return machines;
-    }
-    
-    return 'Unknown';
-  };
 
   // Check if mobile
   useEffect(() => {
@@ -114,23 +60,53 @@ export default function PreventiveMaintenanceListPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Effect to sync local filters with context
+  // Sync context filters with API
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
       setFilterParams({
         ...filterParams,
-        status: filters.status,
-        frequency: filters.frequency,
-        search: filters.search,
-        start_date: filters.startDate,
-        end_date: filters.endDate,
-        page: currentPage,
-        page_size: pageSize
+        status: currentFilters.status,
+        frequency: currentFilters.frequency,
+        search: currentFilters.search,
+        start_date: currentFilters.startDate,
+        end_date: currentFilters.endDate,
+        page: currentFilters.page,
+        page_size: currentFilters.pageSize
       });
     }, 300);
 
     return () => clearTimeout(debounceTimer);
-  }, [filters, currentPage, pageSize]);
+  }, [currentFilters, setFilterParams]);
+
+  // Helper function to safely get machine names
+  const getMachineNames = (machines: any) => {
+    if (!machines) return 'None';
+    
+    if (Array.isArray(machines)) {
+      if (machines.length === 0) return 'None';
+      
+      const names = machines
+        .map(machine => {
+          if (typeof machine === 'string') return machine;
+          if (typeof machine === 'object' && machine.name) return machine.name;
+          if (typeof machine === 'object' && machine.machine_name) return machine.machine_name;
+          return 'Unknown';
+        })
+        .filter(name => name !== 'Unknown');
+      
+      return names.length > 0 ? names.join(', ') : 'Unknown';
+    }
+    
+    if (typeof machines === 'object') {
+      return machines.name || machines.machine_name || 'Unknown';
+    }
+    
+    if (typeof machines === 'string') {
+      return machines;
+    }
+    
+    return 'Unknown';
+  };
 
   // Helper functions
   const formatDate = (dateString: string) => {
@@ -178,31 +154,13 @@ export default function PreventiveMaintenanceListPage() {
     return frequencyMap[frequency] || frequency;
   };
 
-  // Filter handlers
-  const handleFilterChange = (key: keyof FilterState, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-    setCurrentPage(1); // Reset to first page when filtering
+  // Filter handlers using context
+  const handleFilterChange = (key: keyof typeof currentFilters, value: string | number) => {
+    updateFilter(key, value);
   };
 
   const clearAllFilters = () => {
-    setFilters({
-      status: '',
-      frequency: '',
-      search: '',
-      startDate: '',
-      endDate: ''
-    });
-    setCurrentPage(1);
-  };
-
-  // Sorting
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
+    clearFilters();
   };
 
   // Selection handlers
@@ -248,12 +206,18 @@ export default function PreventiveMaintenanceListPage() {
   };
 
   // Pagination
-  const totalPages = Math.ceil(totalCount / pageSize);
-  const startItem = (currentPage - 1) * pageSize + 1;
-  const endItem = Math.min(currentPage * pageSize, totalCount);
+  const totalPages = Math.ceil(totalCount / currentFilters.pageSize);
+  const startItem = (currentFilters.page - 1) * currentFilters.pageSize + 1;
+  const endItem = Math.min(currentFilters.page * currentFilters.pageSize, totalCount);
 
   // Active filters count
-  const activeFiltersCount = Object.values(filters).filter(value => value !== '').length;
+  const activeFiltersCount = [
+    currentFilters.status,
+    currentFilters.frequency,
+    currentFilters.search,
+    currentFilters.startDate,
+    currentFilters.endDate
+  ].filter(value => value !== '').length;
 
   // Mobile Item Menu Component
   const ItemMenu = ({ item }: { item: PreventiveMaintenance }) => (
@@ -301,7 +265,7 @@ export default function PreventiveMaintenanceListPage() {
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-lg ${
+              className={`relative p-2 rounded-lg ${
                 showFilters ? 'bg-blue-50 text-blue-700' : 'text-gray-600'
               }`}
             >
@@ -357,7 +321,7 @@ export default function PreventiveMaintenanceListPage() {
             </Link>
             
             <Link
-              href="/dashboard/preventive-maintenance/generate-report"
+              href="/dashboard/preventive-maintenance/pdf"
               className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               <FileText className="h-4 w-4 mr-2" />
@@ -393,7 +357,7 @@ export default function PreventiveMaintenanceListPage() {
               <input
                 type="text"
                 placeholder="Search maintenance tasks..."
-                value={filters.search}
+                value={currentFilters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
@@ -401,7 +365,7 @@ export default function PreventiveMaintenanceListPage() {
             
             <div className="grid grid-cols-2 gap-3 mb-4">
               <select
-                value={filters.status}
+                value={currentFilters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
                 className="px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               >
@@ -412,7 +376,7 @@ export default function PreventiveMaintenanceListPage() {
               </select>
 
               <select
-                value={filters.frequency}
+                value={currentFilters.frequency}
                 onChange={(e) => handleFilterChange('frequency', e.target.value)}
                 className="px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               >
@@ -431,14 +395,14 @@ export default function PreventiveMaintenanceListPage() {
             <div className="grid grid-cols-2 gap-3 mb-4">
               <input
                 type="date"
-                value={filters.startDate}
+                value={currentFilters.startDate}
                 onChange={(e) => handleFilterChange('startDate', e.target.value)}
                 className="px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 placeholder="Start date"
               />
               <input
                 type="date"
-                value={filters.endDate}
+                value={currentFilters.endDate}
                 onChange={(e) => handleFilterChange('endDate', e.target.value)}
                 className="px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 placeholder="End date"
@@ -473,7 +437,7 @@ export default function PreventiveMaintenanceListPage() {
                   <input
                     type="text"
                     placeholder="Search by title or ID..."
-                    value={filters.search}
+                    value={currentFilters.search}
                     onChange={(e) => handleFilterChange('search', e.target.value)}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
@@ -486,7 +450,7 @@ export default function PreventiveMaintenanceListPage() {
                   Status
                 </label>
                 <select
-                  value={filters.status}
+                  value={currentFilters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
@@ -503,7 +467,7 @@ export default function PreventiveMaintenanceListPage() {
                   Frequency
                 </label>
                 <select
-                  value={filters.frequency}
+                  value={currentFilters.frequency}
                   onChange={(e) => handleFilterChange('frequency', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
@@ -527,13 +491,13 @@ export default function PreventiveMaintenanceListPage() {
                 <div className="flex gap-2">
                   <input
                     type="date"
-                    value={filters.startDate}
+                    value={currentFilters.startDate}
                     onChange={(e) => handleFilterChange('startDate', e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <input
                     type="date"
-                    value={filters.endDate}
+                    value={currentFilters.endDate}
                     onChange={(e) => handleFilterChange('endDate', e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
@@ -788,8 +752,8 @@ export default function PreventiveMaintenanceListPage() {
                 {startItem}-{endItem} of {totalCount}
               </span>
               <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
+                value={currentFilters.pageSize}
+                onChange={(e) => handleFilterChange('pageSize', Number(e.target.value))}
                 className="px-2 py-1 border border-gray-300 rounded text-sm"
               >
                 <option value={10}>10</option>
@@ -800,8 +764,8 @@ export default function PreventiveMaintenanceListPage() {
             
             <div className="flex items-center justify-center space-x-2">
               <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
+                onClick={() => handleFilterChange('page', Math.max(1, currentFilters.page - 1))}
+                disabled={currentFilters.page === 1}
                 className="flex items-center px-3 py-2 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
@@ -809,12 +773,12 @@ export default function PreventiveMaintenanceListPage() {
               </button>
               
               <span className="px-4 py-2 text-sm text-gray-600">
-                Page {currentPage} of {totalPages}
+                Page {currentFilters.page} of {totalPages}
               </span>
               
               <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
+                onClick={() => handleFilterChange('page', Math.min(totalPages, currentFilters.page + 1))}
+                disabled={currentFilters.page === totalPages}
                 className="flex items-center px-3 py-2 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
@@ -832,8 +796,8 @@ export default function PreventiveMaintenanceListPage() {
                 Showing {startItem} to {endItem} of {totalCount} results
               </span>
               <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
+                value={currentFilters.pageSize}
+                onChange={(e) => handleFilterChange('pageSize', Number(e.target.value))}
                 className="ml-4 px-2 py-1 border border-gray-300 rounded text-sm"
               >
                 <option value={10}>10 per page</option>
@@ -844,23 +808,23 @@ export default function PreventiveMaintenanceListPage() {
             
             <div className="flex items-center space-x-1">
               <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
+                onClick={() => handleFilterChange('page', Math.max(1, currentFilters.page - 1))}
+                disabled={currentFilters.page === 1}
                 className="p-2 text-gray-600 hover:text-gray-900 disabled:text-gray-400 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               
               {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                const pageNum = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
+                const pageNum = currentFilters.page <= 3 ? i + 1 : currentFilters.page - 2 + i;
                 if (pageNum > totalPages) return null;
                 
                 return (
                   <button
                     key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
+                    onClick={() => handleFilterChange('page', pageNum)}
                     className={`px-3 py-1 text-sm rounded ${
-                      currentPage === pageNum
+                      currentFilters.page === pageNum
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                     }`}
@@ -871,8 +835,8 @@ export default function PreventiveMaintenanceListPage() {
               })}
               
               <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
+                onClick={() => handleFilterChange('page', Math.min(totalPages, currentFilters.page + 1))}
+                disabled={currentFilters.page === totalPages}
                 className="p-2 text-gray-600 hover:text-gray-900 disabled:text-gray-400 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="h-4 w-4" />
