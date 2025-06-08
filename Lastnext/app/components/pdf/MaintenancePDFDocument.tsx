@@ -16,6 +16,22 @@ import {
   determinePMStatus 
 } from '@/app/lib/preventiveMaintenanceModels';
 
+// Extended interface for images
+interface MaintenanceImage {
+  id: string;
+  url: string;
+  type: 'before' | 'after';
+  caption?: string;
+  timestamp?: string;
+}
+
+// Extended PreventiveMaintenance interface for images
+interface PreventiveMaintenanceWithImages extends PreventiveMaintenance {
+  images?: MaintenanceImage[];
+  before_images?: MaintenanceImage[];
+  after_images?: MaintenanceImage[];
+}
+
 // Define styles - only using supported @react-pdf/renderer properties
 const styles = StyleSheet.create({
   page: {
@@ -236,11 +252,88 @@ const styles = StyleSheet.create({
   },
   uppercaseText: {
     textTransform: 'uppercase'
+  },
+  // Image-related styles
+  imageSection: {
+    marginTop: 10,
+    marginBottom: 10
+  },
+  imageContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15
+  },
+  imageGroup: {
+    width: '48%',
+    textAlign: 'center'
+  },
+  imageGroupTitle: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+    textAlign: 'center',
+    backgroundColor: '#f3f4f6',
+    padding: 5
+  },
+  maintenanceImage: {
+    width: '100%',
+    height: 150,
+    objectFit: 'cover',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderStyle: 'solid',
+    marginBottom: 5
+  },
+  imageCaption: {
+    fontSize: 8,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 3
+  },
+  imageTimestamp: {
+    fontSize: 7,
+    color: '#9ca3af',
+    textAlign: 'center'
+  },
+  multiImageContainer: {
+    flexDirection: 'column',
+    gap: 8
+  },
+  imageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8
+  },
+  smallImage: {
+    width: '49%',
+    height: 100,
+    objectFit: 'cover',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderStyle: 'solid'
+  },
+  noImagesText: {
+    fontSize: 9,
+    color: '#9ca3af',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: 20
+  },
+  imageErrorText: {
+    fontSize: 8,
+    color: '#dc2626',
+    textAlign: 'center',
+    padding: 10,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderStyle: 'solid'
   }
 });
 
 interface MaintenancePDFDocumentProps {
-  data: PreventiveMaintenance[];
+  data: PreventiveMaintenanceWithImages[];
   appliedFilters?: {
     status?: string;
     frequency?: string;
@@ -264,6 +357,17 @@ const formatDate = (dateString: string | null | undefined) => {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
+  });
+};
+
+const formatDateTime = (dateString: string | null | undefined) => {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   });
 };
 
@@ -321,6 +425,142 @@ const getStatusStyle = (status: string) => {
   }
 };
 
+// Image helper functions
+const getBeforeImages = (item: PreventiveMaintenanceWithImages): MaintenanceImage[] => {
+  const beforeImages: MaintenanceImage[] = [];
+  
+  // Check for dedicated before_images array
+  if (item.before_images && item.before_images.length > 0) {
+    beforeImages.push(...item.before_images);
+  }
+  
+  // Check for images with type 'before'
+  if (item.images && item.images.length > 0) {
+    const filteredBefore = item.images.filter(img => img.type === 'before');
+    beforeImages.push(...filteredBefore);
+  }
+  
+  return beforeImages;
+};
+
+const getAfterImages = (item: PreventiveMaintenanceWithImages): MaintenanceImage[] => {
+  const afterImages: MaintenanceImage[] = [];
+  
+  // Check for dedicated after_images array
+  if (item.after_images && item.after_images.length > 0) {
+    afterImages.push(...item.after_images);
+  }
+  
+  // Check for images with type 'after'
+  if (item.images && item.images.length > 0) {
+    const filteredAfter = item.images.filter(img => img.type === 'after');
+    afterImages.push(...filteredAfter);
+  }
+  
+  return afterImages;
+};
+
+const hasImages = (item: PreventiveMaintenanceWithImages): boolean => {
+  return getBeforeImages(item).length > 0 || getAfterImages(item).length > 0;
+};
+
+// Image rendering components
+const ImageDisplay: React.FC<{ 
+  image: MaintenanceImage; 
+  style?: any; 
+  showCaption?: boolean; 
+  showTimestamp?: boolean; 
+}> = ({ image, style = styles.maintenanceImage, showCaption = true, showTimestamp = true }) => {
+  try {
+    return (
+      <View>
+        <Image src={image.url} style={style} />
+        {showCaption && image.caption && (
+          <Text style={styles.imageCaption}>{image.caption}</Text>
+        )}
+        {showTimestamp && image.timestamp && (
+          <Text style={styles.imageTimestamp}>
+            {formatDateTime(image.timestamp)}
+          </Text>
+        )}
+      </View>
+    );
+  } catch (error) {
+    return (
+      <View style={[style, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={styles.imageErrorText}>
+          Image could not be loaded
+        </Text>
+      </View>
+    );
+  }
+};
+
+const MultipleImagesDisplay: React.FC<{ images: MaintenanceImage[] }> = ({ images }) => {
+  if (images.length === 0) {
+    return (
+      <Text style={styles.noImagesText}>No images available</Text>
+    );
+  }
+
+  if (images.length === 1) {
+    return <ImageDisplay image={images[0]} />;
+  }
+
+  if (images.length === 2) {
+    return (
+      <View style={styles.imageRow}>
+        <ImageDisplay image={images[0]} style={styles.smallImage} showCaption={false} />
+        <ImageDisplay image={images[1]} style={styles.smallImage} showCaption={false} />
+      </View>
+    );
+  }
+
+  // For more than 2 images, show first 2 and indicate more
+  return (
+    <View style={styles.multiImageContainer}>
+      <View style={styles.imageRow}>
+        <ImageDisplay image={images[0]} style={styles.smallImage} showCaption={false} />
+        <ImageDisplay image={images[1]} style={styles.smallImage} showCaption={false} />
+      </View>
+      {images.length > 2 && (
+        <Text style={styles.imageCaption}>
+          + {images.length - 2} more image{images.length > 3 ? 's' : ''}
+        </Text>
+      )}
+    </View>
+  );
+};
+
+const BeforeAfterImages: React.FC<{ item: PreventiveMaintenanceWithImages }> = ({ item }) => {
+  const beforeImages = getBeforeImages(item);
+  const afterImages = getAfterImages(item);
+
+  if (beforeImages.length === 0 && afterImages.length === 0) {
+    return (
+      <View style={styles.imageSection}>
+        <Text style={styles.noImagesText}>No before/after images available for this task</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.imageSection}>
+      <Text style={styles.sectionTitle}>Before & After Images</Text>
+      <View style={styles.imageContainer}>
+        <View style={styles.imageGroup}>
+          <Text style={styles.imageGroupTitle}>BEFORE</Text>
+          <MultipleImagesDisplay images={beforeImages} />
+        </View>
+        <View style={styles.imageGroup}>
+          <Text style={styles.imageGroupTitle}>AFTER</Text>
+          <MultipleImagesDisplay images={afterImages} />
+        </View>
+      </View>
+    </View>
+  );
+};
+
 const MaintenancePDFDocument: React.FC<MaintenancePDFDocumentProps> = ({
   data,
   appliedFilters,
@@ -333,6 +573,7 @@ const MaintenancePDFDocument: React.FC<MaintenancePDFDocumentProps> = ({
   const completedTasks = data.filter(item => getTaskStatus(item) === 'completed').length;
   const pendingTasks = data.filter(item => getTaskStatus(item) === 'pending').length;
   const overdueTasks = data.filter(item => getTaskStatus(item) === 'overdue').length;
+  const tasksWithImages = includeImages ? data.filter(item => hasImages(item)).length : 0;
 
   // Check if filters are applied
   const hasFilters = appliedFilters && Object.values(appliedFilters).some(filter => filter !== '');
@@ -397,6 +638,12 @@ const MaintenancePDFDocument: React.FC<MaintenancePDFDocumentProps> = ({
               <Text style={[styles.summaryNumber, { color: '#dc2626' }]}>{overdueTasks}</Text>
               <Text style={styles.summaryLabel}>Overdue</Text>
             </View>
+            {includeImages && (
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryNumber, { color: '#7c3aed' }]}>{tasksWithImages}</Text>
+                <Text style={styles.summaryLabel}>With Images</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -426,7 +673,9 @@ const MaintenancePDFDocument: React.FC<MaintenancePDFDocumentProps> = ({
                   <Text style={styles.tableCellText}>Topics</Text>
                 </View>
                 <View style={styles.tableColHeader}>
-                  <Text style={styles.tableCellText}>Location</Text>
+                  <Text style={styles.tableCellText}>
+                    {includeImages ? 'Images' : 'Location'}
+                  </Text>
                 </View>
               </View>
 
@@ -463,7 +712,13 @@ const MaintenancePDFDocument: React.FC<MaintenancePDFDocumentProps> = ({
                   </View>
                   <View style={styles.tableCol}>
                     <Text style={styles.tableCellText}>
-                      {getLocationString(item)}
+                      {includeImages ? 
+                        (hasImages(item) ? 
+                          `${getBeforeImages(item).length}B/${getAfterImages(item).length}A` : 
+                          'No images'
+                        ) : 
+                        getLocationString(item)
+                      }
                     </Text>
                   </View>
                 </View>
@@ -558,6 +813,11 @@ const MaintenancePDFDocument: React.FC<MaintenancePDFDocumentProps> = ({
                     <Text style={styles.detailLabel}>Notes:</Text>
                     <Text style={styles.description}>{item.notes}</Text>
                   </View>
+                )}
+
+                {/* Before/After Images Section */}
+                {includeImages && hasImages(item) && (
+                  <BeforeAfterImages item={item} />
                 )}
 
                 {item.completed_date && (
