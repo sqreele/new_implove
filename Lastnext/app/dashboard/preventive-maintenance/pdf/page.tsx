@@ -1,4 +1,3 @@
-// app/dashboard/preventive-maintenance/pdf/page.tsx
 'use client';
 
 import React from 'react';
@@ -8,5 +7,6 @@ import PDFMaintenanceGenerator from '@/app/components/ducument/ PDFMaintenanceGe
 export default function PDFGeneratorPage() {
   const { currentFilters } = useFilters();
 
+  // ✅ Correct: The 'PDFMaintenanceGenerator' component accepts the initialFilters prop.
   return <PDFMaintenanceGenerator initialFilters={currentFilters} />;
 }
