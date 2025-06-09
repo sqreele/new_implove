@@ -41,10 +41,9 @@ interface MaintenanceImage {
   url: string;
   type: 'before' | 'after';
   caption?: string;
-  timestamp?: string | null; 
+  timestamp?: string;
   file?: File;
   taskId?: string;
-
 }
 
 interface PreventiveMaintenanceWithImages extends PreventiveMaintenance {
@@ -95,11 +94,6 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   });
   const [imagePreviewMode, setImagePreviewMode] = useState<'before' | 'after' | 'all'>('all');
 
-  // API Image processing states
-  const [isProcessingApiImages, setIsProcessingApiImages] = useState(false);
-  const [apiImageError, setApiImageError] = useState<string | null>(null);
-  const [apiImageProgress, setApiImageProgress] = useState(0);
-
   // Fetch data with initial filters when component mounts
   useEffect(() => {
     const loadData = async () => {
@@ -126,120 +120,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   };
 
   // ===================
-  // API IMAGE FUNCTIONS
-  // ===================
-
-  /**
-   * Fetches an image from URL and converts to data URL for PDF
-   */
-  const fetchImageAsDataURL = async (imageUrl: string): Promise<string> => {
-    try {
-      // Handle relative URLs
-      const fullUrl = imageUrl.startsWith('http') ? imageUrl : `https://pmcs.site${imageUrl}`;
-      
-      const response = await fetch(fullUrl, {
-        method: 'GET',
-        mode: 'cors',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.status}`);
-      }
-      
-      const blob = await response.blob();
-      
-      // Convert blob to data URL
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error('Error fetching image:', error);
-      throw new Error(`Failed to load image from ${imageUrl}`);
-    }
-  };
-
-  /**
-   * Converts HTTP URL images to data URLs for PDF compatibility
-   */
-  const convertApiImagesToDataURL = async (
-    items: PreventiveMaintenance[],
-    onProgress?: (progress: number) => void
-  ): Promise<PreventiveMaintenanceWithImages[]> => {
-    const convertedItems: PreventiveMaintenanceWithImages[] = [];
-    const totalItems = items.length;
-    
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const convertedItem: PreventiveMaintenanceWithImages = { ...item };
-      
-      try {
-        const beforeImages: MaintenanceImage[] = [];
-        const afterImages: MaintenanceImage[] = [];
-        
-        // Process before_image_url
-        if (item.before_image_url) {
-          try {
-            const beforeDataURL = await fetchImageAsDataURL(item.before_image_url);
-            beforeImages.push({
-              id: `api_before_${item.pm_id}`,
-              url: beforeDataURL,
-              type: 'before',
-              caption: 'Before maintenance',
-              timestamp: item.scheduled_date,
-              taskId: item.pm_id
-            });
-          } catch (error) {
-            console.error(`Failed to load before image for ${item.pm_id}:`, error);
-          }
-        }
-        
-        // Process after_image_url
-        if (item.after_image_url) {
-          try {
-            const afterDataURL = await fetchImageAsDataURL(item.after_image_url);
-            afterImages.push({
-              id: `api_after_${item.pm_id}`,
-              url: afterDataURL,
-              type: 'after',
-              caption: 'After maintenance',
-              timestamp: item.completed_date,
-              taskId: item.pm_id
-            });
-          } catch (error) {
-            console.error(`Failed to load after image for ${item.pm_id}:`, error);
-          }
-        }
-        
-        // Add images to the converted item
-        convertedItem.before_images = beforeImages;
-        convertedItem.after_images = afterImages;
-        convertedItem.images = [...beforeImages, ...afterImages];
-        
-      } catch (error) {
-        console.error(`Error processing images for ${item.pm_id}:`, error);
-        // Add empty arrays so the item still appears in the PDF
-        convertedItem.before_images = [];
-        convertedItem.after_images = [];
-        convertedItem.images = [];
-      }
-      
-      convertedItems.push(convertedItem);
-      
-      // Update progress
-      if (onProgress) {
-        const progress = Math.round(((i + 1) / totalItems) * 100);
-        onProgress(progress);
-      }
-    }
-    
-    return convertedItems;
-  };
-
-  // ===================
-  // LOCAL IMAGE HELPER FUNCTIONS
+  // IMAGE HELPER FUNCTIONS
   // ===================
 
   /**
@@ -249,20 +130,12 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     const maxSize = 10 * 1024 * 1024; // 10MB
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     
-    if (!file) {
-      return { isValid: false, error: 'No file provided' };
-    }
-    
-    if (!allowedTypes.includes(file.type.toLowerCase())) {
-      return { isValid: false, error: `Invalid file type: ${file.type}. Please upload JPEG, PNG, or WebP images.` };
+    if (!allowedTypes.includes(file.type)) {
+      return { isValid: false, error: 'Invalid file type. Please upload JPEG, PNG, or WebP images.' };
     }
     
     if (file.size > maxSize) {
-      return { isValid: false, error: `File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Please upload images smaller than 10MB.` };
-    }
-    
-    if (file.size === 0) {
-      return { isValid: false, error: 'File is empty' };
+      return { isValid: false, error: 'File too large. Please upload images smaller than 10MB.' };
     }
     
     return { isValid: true };
@@ -274,15 +147,8 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   const fileToDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        if (result && result.startsWith('data:')) {
-          resolve(result);
-        } else {
-          reject(new Error('Invalid data URL generated'));
-        }
-      };
-      reader.onerror = (error) => reject(error);
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   };
@@ -296,102 +162,24 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
       const ctx = canvas.getContext('2d');
       const img = new Image();
       
-      if (!ctx) {
-        reject(new Error('Cannot get canvas context'));
-        return;
-      }
-      
       img.onload = () => {
-        try {
-          // Calculate new dimensions
-          const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
-          const newWidth = Math.round(img.width * ratio);
-          const newHeight = Math.round(img.height * ratio);
-          
-          // Set canvas size
-          canvas.width = newWidth;
-          canvas.height = newHeight;
-          
-          // Clear canvas and draw image
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, newWidth, newHeight);
-          ctx.drawImage(img, 0, 0, newWidth, newHeight);
-          
-          // Convert to data URL with proper format
-          const dataURL = canvas.toDataURL('image/jpeg', quality);
-          
-          // Clean up
-          URL.revokeObjectURL(img.src);
-          
-          resolve(dataURL);
-        } catch (error) {
-          reject(new Error(`Failed to resize image: ${error}`));
-        }
+        // Calculate new dimensions
+        const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
+        const newWidth = img.width * ratio;
+        const newHeight = img.height * ratio;
+        
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, newWidth, newHeight);
+        const dataURL = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataURL);
       };
       
-      img.onerror = () => {
-        URL.revokeObjectURL(img.src);
-        reject(new Error('Failed to load image for resizing'));
-      };
-      
-      // Set crossOrigin before src to avoid CORS issues
-      img.crossOrigin = 'anonymous';
+      img.onerror = reject;
       img.src = URL.createObjectURL(file);
     });
-  };
-
-  /**
-   * Validates and processes image file for PDF
-   */
-  const processImageForPDF = async (file: File): Promise<string> => {
-    // Validate file
-    const validation = validateImageFile(file);
-    if (!validation.isValid) {
-      throw new Error(validation.error);
-    }
-    
-    try {
-      // For small images, use direct data URL
-      if (file.size < 1024 * 1024) { // Less than 1MB
-        return await fileToDataURL(file);
-      }
-      
-      // For larger images, resize first
-      return await resizeImage(file, 600, 0.7);
-    } catch (error) {
-      console.error('Error processing image:', error);
-      throw new Error(`Failed to process image: ${file.name}`);
-    }
-  };
-
-  /**
-   * Debug function to validate image data URL
-   */
-  const validateImageDataURL = (dataURL: string): boolean => {
-    if (!dataURL || typeof dataURL !== 'string') {
-      console.error('Invalid data URL: not a string');
-      return false;
-    }
-    
-    if (!dataURL.startsWith('data:image/')) {
-      console.error('Invalid data URL: incorrect format');
-      return false;
-    }
-    
-    const parts = dataURL.split(',');
-    if (parts.length !== 2) {
-      console.error('Invalid data URL: incorrect structure');
-      return false;
-    }
-    
-    try {
-      // Try to decode base64 part
-      atob(parts[1]);
-      return true;
-    } catch (error) {
-      console.error('Invalid data URL: cannot decode base64');
-      return false;
-    }
   };
 
   /**
@@ -401,8 +189,13 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     const newImages: MaintenanceImage[] = [];
     
     for (const file of files) {
+      const validation = validateImageFile(file);
+      if (!validation.isValid) {
+        throw new Error(validation.error);
+      }
+      
       try {
-        const dataURL = await processImageForPDF(file);
+        const dataURL = await resizeImage(file);
         const newImage: MaintenanceImage = {
           id: `before_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           url: dataURL,
@@ -415,7 +208,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
         newImages.push(newImage);
       } catch (error) {
         console.error('Error processing before image:', error);
-        throw new Error(`Failed to process image: ${file.name} - ${error}`);
+        throw new Error(`Failed to process image: ${file.name}`);
       }
     }
     
@@ -429,8 +222,13 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     const newImages: MaintenanceImage[] = [];
     
     for (const file of files) {
+      const validation = validateImageFile(file);
+      if (!validation.isValid) {
+        throw new Error(validation.error);
+      }
+      
       try {
-        const dataURL = await processImageForPDF(file);
+        const dataURL = await resizeImage(file);
         const newImage: MaintenanceImage = {
           id: `after_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           url: dataURL,
@@ -443,7 +241,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
         newImages.push(newImage);
       } catch (error) {
         console.error('Error processing after image:', error);
-        throw new Error(`Failed to process image: ${file.name} - ${error}`);
+        throw new Error(`Failed to process image: ${file.name}`);
       }
     }
     
@@ -451,46 +249,18 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   }, []);
 
   /**
-   * Enhanced image upload handler with better error handling
+   * Handles image upload with progress tracking
    */
   const handleImageUpload = async (taskId: string, files: File[], type: 'before' | 'after') => {
     setImageUploadState({ isUploading: true, progress: 0 });
     
     try {
-      const totalFiles = files.length;
-      let processedFiles = 0;
-      let newImages: MaintenanceImage[] = [];
+      let newImages: MaintenanceImage[];
       
-      for (const file of files) {
-        try {
-          console.log(`Processing ${type} image:`, file.name, file.size, file.type);
-          
-          let imageData: MaintenanceImage;
-          
-          if (type === 'before') {
-            const [beforeImage] = await addBeforeImages(taskId, [file]);
-            imageData = beforeImage;
-          } else {
-            const [afterImage] = await addAfterImages(taskId, [file]);
-            imageData = afterImage;
-          }
-          
-          // Validate the processed image
-          if (!validateImageDataURL(imageData.url)) {
-            throw new Error(`Invalid image data generated for ${file.name}`);
-          }
-          
-          newImages.push(imageData);
-          processedFiles++;
-          
-          // Update progress
-          const progress = Math.round((processedFiles / totalFiles) * 100);
-          setImageUploadState({ isUploading: true, progress });
-          
-        } catch (error) {
-          console.error(`Error processing file ${file.name}:`, error);
-          throw error;
-        }
+      if (type === 'before') {
+        newImages = await addBeforeImages(taskId, files);
+      } else {
+        newImages = await addAfterImages(taskId, files);
       }
       
       // Update task images
@@ -510,7 +280,6 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
       }, 1000);
       
     } catch (error) {
-      console.error('Image upload error:', error);
       setImageUploadState({ 
         isUploading: false, 
         progress: 0, 
@@ -520,7 +289,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
       // Clear error after delay
       setTimeout(() => {
         setImageUploadState({ isUploading: false, progress: 0 });
-      }, 5000);
+      }, 3000);
     }
   };
 
@@ -559,7 +328,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   };
 
   /**
-   * Gets all before images for a task (local only)
+   * Gets all before images for a task
    */
   const getBeforeImages = (taskId: string): MaintenanceImage[] => {
     const images = taskImages.get(taskId) || [];
@@ -567,7 +336,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   };
 
   /**
-   * Gets all after images for a task (local only)
+   * Gets all after images for a task
    */
   const getAfterImages = (taskId: string): MaintenanceImage[] => {
     const images = taskImages.get(taskId) || [];
@@ -575,7 +344,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   };
 
   /**
-   * Checks if a task has any local images
+   * Checks if a task has any images
    */
   const taskHasImages = (taskId: string): boolean => {
     const images = taskImages.get(taskId) || [];
@@ -620,7 +389,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   };
 
   /**
-   * Exports images for a task
+   * Exports images for a task (useful for backup) - requires JSZip library
    */
   const exportTaskImages = async (taskId: string) => {
     const images = taskImages.get(taskId) || [];
@@ -629,6 +398,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
       return;
     }
     
+    // Simple export without zip - download each image individually
     const task = filteredData.find(item => item.pm_id === taskId);
     const taskName = task?.pmtitle || 'maintenance';
     
@@ -650,7 +420,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   };
 
   // ===================
-  // DATA PREPARATION FUNCTIONS
+  // END IMAGE FUNCTIONS
   // ===================
 
   // Client-side filtering (for PDF display only)
@@ -678,52 +448,13 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     return statusMatch && frequencyMatch && dateMatch && completedMatch && searchMatch;
   });
 
-  /**
-   * Transform filtered data to include both API and local images
-   */
-  const prepareDataWithImages = useCallback(async (): Promise<PreventiveMaintenanceWithImages[]> => {
-    try {
-      setIsProcessingApiImages(true);
-      setApiImageError(null);
-      setApiImageProgress(0);
-
-      // First convert API images to data URLs
-      const dataWithApiImages = await convertApiImagesToDataURL(
-        filteredData, 
-        (progress) => setApiImageProgress(progress)
-      );
-      
-      // Then merge with locally uploaded images
-      const finalData = dataWithApiImages.map(item => {
-        const localImages = taskImages.get(item.pm_id) || [];
-        const localBeforeImages = localImages.filter(img => img.type === 'before');
-        const localAfterImages = localImages.filter(img => img.type === 'after');
-        
-        return {
-          ...item,
-          before_images: [...(item.before_images || []), ...localBeforeImages],
-          after_images: [...(item.after_images || []), ...localAfterImages],
-          images: [...(item.images || []), ...localImages]
-        };
-      });
-      
-      setIsProcessingApiImages(false);
-      return finalData;
-      
-    } catch (error) {
-      console.error('Error preparing data with images:', error);
-      setApiImageError(error instanceof Error ? error.message : 'Failed to process images');
-      setIsProcessingApiImages(false);
-      
-      // Return data without API images but with local images
-      return filteredData.map(item => ({
-        ...item,
-        before_images: getBeforeImages(item.pm_id),
-        after_images: getAfterImages(item.pm_id),
-        images: taskImages.get(item.pm_id) || []
-      }));
-    }
-  }, [filteredData, taskImages]);
+  // Transform filtered data to include images
+  const dataWithImages: PreventiveMaintenanceWithImages[] = filteredData.map(item => ({
+    ...item,
+    before_images: getBeforeImages(item.pm_id),
+    after_images: getAfterImages(item.pm_id),
+    images: taskImages.get(item.pm_id) || []
+  }));
 
   // Prepare applied filters for PDF
   const appliedFilters = {
@@ -746,37 +477,25 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   // Get image statistics
   const imageStats = getImageStatistics();
 
-  // ===================
-  // PDF GENERATION FUNCTIONS
-  // ===================
-
   // Generate PDF blob for download
   const generatePDFBlob = async () => {
-    try {
-      const dataWithAllImages = await prepareDataWithImages();
-      
-      const doc = (
-        <MaintenancePDFDocument
-          data={dataWithAllImages as any} 
-          appliedFilters={appliedFilters}
-          includeDetails={includeDetails}
-          includeImages={includeImages}
-          title={pdfTitle}
-        />
-      );
-      
-      const blob = await pdf(doc).toBlob();
-      return blob;
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      throw error;
-    }
+    const doc = (
+      <MaintenancePDFDocument
+        data={dataWithImages}
+        appliedFilters={appliedFilters}
+        includeDetails={includeDetails}
+        includeImages={includeImages}
+        title={pdfTitle}
+      />
+    );
+    
+    const blob = await pdf(doc).toBlob();
+    return blob;
   };
 
   // Manual download function
   const handleManualDownload = async () => {
     try {
-      setIsProcessingApiImages(true);
       const blob = await generatePDFBlob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -789,8 +508,6 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF. Please try again.');
-    } finally {
-      setIsProcessingApiImages(false);
     }
   };
 
@@ -802,22 +519,14 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     }
   };
 
-  // Create the PDF document element for preview
-  const [previewData, setPreviewData] = useState<PreventiveMaintenanceWithImages[]>([]);
-
-  // Update preview data when filters change
-  useEffect(() => {
-    if (showPreview) {
-      prepareDataWithImages().then(setPreviewData);
-    }
-  }, [showPreview, filteredData, taskImages, prepareDataWithImages]);
-
+  // Create the PDF document element
   const pdfDocument = (
     <MaintenancePDFDocument
-      data={previewData as any} 
+      data={dataWithImages}
       appliedFilters={appliedFilters}
-      includeImages={includeImages}
+      
       includeDetails={includeDetails}
+      includeImages={includeImages}
       title={pdfTitle}
     />
   );
@@ -878,53 +587,54 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
               {showPreview ? 'Hide Preview' : 'Show Preview'}
             </button>
 
+            {/* Fixed PDFDownloadLink with proper typing */}
+            <BlobProvider document={pdfDocument}>
+              {({ blob, url, loading, error }) => {
+                return (
+                  <a
+                    href={url || '#'}
+                    download={fileName}
+                    className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
+                      loading || error
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-700'
+                    } text-white`}
+                    onClick={(e) => {
+                      if (loading || error || !url) {
+                        e.preventDefault();
+                      }
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating PDF...
+                      </>
+                    ) : error ? (
+                      <>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Error
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download PDF
+                      </>
+                    )}
+                  </a>
+                );
+              }}
+            </BlobProvider>
+
             <button
               onClick={handleManualDownload}
-              disabled={isProcessingApiImages}
-              className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-                isProcessingApiImages
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700'
-              } text-white`}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              {isProcessingApiImages ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing Images...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
-                </>
-              )}
+              <Download className="h-4 w-4 mr-2" />
+              Download Now
             </button>
           </div>
         </div>
-
-        {/* API Image Processing Status */}
-        {isProcessingApiImages && (
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Loader2 className="h-4 w-4 text-blue-600 mr-2 animate-spin" />
-                <span className="text-sm text-blue-800">Processing API images for PDF...</span>
-              </div>
-              <span className="text-sm text-blue-600">{apiImageProgress}%</span>
-            </div>
-          </div>
-        )}
-
-        {apiImageError && (
-          <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-            <div className="flex items-center">
-              <AlertCircle className="h-4 w-4 text-yellow-600 mr-2" />
-              <span className="text-sm text-yellow-800">
-                Warning: Some API images could not be loaded: {apiImageError}
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* PDF Title Input */}
         <div className="mb-6">
@@ -1056,7 +766,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
         {/* Image Statistics */}
         {includeImages && imageStats.totalImages > 0 && (
           <div className="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-            <h3 className="font-medium text-purple-900 mb-2">Local Image Statistics:</h3>
+            <h3 className="font-medium text-purple-900 mb-2">Image Statistics:</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="text-purple-800">
                 <span className="font-medium">{imageStats.totalImages}</span> Total Images
@@ -1081,7 +791,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
             <p className="text-sm text-green-800">
               <strong>Ready to Generate:</strong> Found {maintenanceData.length} total maintenance records, 
               showing {filteredData.length} after filters
-              {includeImages && ` (${imageStats.tasksWithImages} with local images)`}
+              {includeImages && ` (${imageStats.tasksWithImages} with images)`}
             </p>
           </div>
         </div>
@@ -1141,17 +851,11 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
                     <div>
                       <h3 className="font-medium text-gray-900">{task.pmtitle || 'No title'}</h3>
                       <p className="text-sm text-gray-600">ID: {task.pm_id}</p>
-                      {task.before_image_url && (
-                        <p className="text-xs text-blue-600">✓ API Before Image</p>
-                      )}
-                      {task.after_image_url && (
-                        <p className="text-xs text-blue-600">✓ API After Image</p>
-                      )}
                     </div>
                     
                     <div className="flex items-center space-x-2">
                       <span className="text-sm text-gray-500">
-                        Local: {beforeImages.length}B / {afterImages.length}A
+                        {beforeImages.length}B / {afterImages.length}A
                       </span>
                       
                       {hasTaskImages && (
@@ -1287,12 +991,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
 
                   {!hasTaskImages && (
                     <div className="text-center py-4 text-gray-500 text-sm">
-                      No local images uploaded for this task
-                      {(task.before_image_url || task.after_image_url) && (
-                        <div className="text-blue-600 text-xs mt-1">
-                          (API images will be included in PDF)
-                        </div>
-                      )}
+                      No images uploaded for this task
                     </div>
                   )}
                 </div>
