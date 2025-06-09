@@ -481,7 +481,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   const generatePDFBlob = async () => {
     const doc = (
       <MaintenancePDFDocument
-        data={dataWithImages}
+        data={dataWithImages as any} 
         appliedFilters={appliedFilters}
         includeDetails={includeDetails}
         includeImages={includeImages}
@@ -522,11 +522,11 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   // Create the PDF document element
   const pdfDocument = (
     <MaintenancePDFDocument
-      data={dataWithImages}
+      data={dataWithImages as any} 
       appliedFilters={appliedFilters}
+      includeImages={true}
       includeDetails={includeDetails}
-      includeImages={includeImages}
-      title={pdfTitle}
+     title={pdfTitle}
     />
   );
 
