@@ -1,6 +1,8 @@
-// Update your PDFMaintenanceGenerator component to accept initial filters
+// PDFMaintenanceGenerator.tsx
 
 import React, { useState, useRef, useEffect } from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { 
   FileText, 
   Download, 
@@ -32,7 +34,7 @@ interface InitialFilters {
   search: string;
   startDate: string;
   endDate: string;
-  machineId: string; // Added machine filter
+  machineId: string;
   page: number;
   pageSize: number;
 }
@@ -53,7 +55,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   // Initialize filters with URL parameters or defaults
   const [filterStatus, setFilterStatus] = useState(initialFilters?.status || 'all');
   const [filterFrequency, setFilterFrequency] = useState(initialFilters?.frequency || 'all');
-  const [filterMachine, setFilterMachine] = useState(initialFilters?.machineId || 'all'); // Added machine filter state
+  const [filterMachine, setFilterMachine] = useState(initialFilters?.machineId || 'all');
   const [dateRange, setDateRange] = useState({ 
     start: initialFilters?.startDate || '', 
     end: initialFilters?.endDate || '' 
@@ -63,6 +65,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   const [includeDetails, setIncludeDetails] = useState(true);
   const [includeImages, setIncludeImages] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const printRef = useRef(null);
 
   // Get unique machines from the data for the filter dropdown
@@ -94,7 +97,7 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
           search: initialFilters.search,
           start_date: initialFilters.startDate,
           end_date: initialFilters.endDate,
-          machine_id: initialFilters.machineId, // Added machine filter
+          machine_id: initialFilters.machineId,
           page: initialFilters.page,
           page_size: initialFilters.pageSize
         });
@@ -149,6 +152,13 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     }
     
     return item.property_id || 'Unknown';
+  };
+
+  // Helper function to get safe image URL
+  const getSafeImageUrl = (imageUrl: string | null | undefined): string | undefined => {
+    if (!imageUrl) return undefined;
+    const url = getImageUrl(imageUrl);
+    return url || undefined;
   };
 
   // Client-side filtering (for PDF display only)
@@ -223,9 +233,66 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     }
   };
 
-  // Generate PDF (browser print functionality)
-  const generatePDF = () => {
-    window.print();
+  // Enhanced PDF generation function
+  const generatePDF = async () => {
+    const element = document.getElementById('pdf-content');
+    if (!element) {
+      console.error('PDF content element not found');
+      return;
+    }
+
+    try {
+      setIsGeneratingPDF(true);
+
+      // Configure html2canvas options
+      const canvas = await html2canvas(element, {
+        scale: 2, // Higher resolution
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: element.scrollWidth,
+        height: element.scrollHeight,
+      });
+
+      // Calculate PDF dimensions
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 0;
+
+      // Handle multi-page PDFs
+      const pageHeight = imgHeight * ratio;
+      let heightLeft = pageHeight;
+      let position = 0;
+
+      // Add first page
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, pageHeight);
+      heightLeft -= pdfHeight;
+
+      // Add additional pages if needed
+      while (heightLeft > 0) {
+        position = heightLeft - pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', imgX, position, imgWidth * ratio, pageHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      // Save the PDF
+      const fileName = `preventive-maintenance-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   // Download as HTML file
@@ -335,10 +402,20 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
           <div className="flex space-x-3">
             <button
               onClick={generatePDF}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={isGeneratingPDF}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Printer className="h-4 w-4 mr-2" />
-              Print PDF
+              {isGeneratingPDF ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Generating PDF...
+                </>
+              ) : (
+                <>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Generate PDF
+                </>
+              )}
             </button>
             <button
               onClick={downloadHTML}
@@ -601,85 +678,69 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
                       {item.pmtitle || 'No title'} ({item.pm_id})
                     </h3>
                     <div className="space-y-2 text-sm">
-                      <div><strong>Scheduled Date:</strong> {formatDate(item.scheduled_date)}</div>
-                      <div><strong>Status:</strong> <span className={`font-medium ${getStatusColor(item)} capitalize`}>{getTaskStatus(item)}</span></div>
-                      <div><strong>Frequency:</strong> <span className={`font-medium ${getFrequencyColor(item.frequency)} capitalize`}>{item.frequency}</span></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="space-y-2 text-sm">
-                      <div><strong>Machines:</strong> {getMachinesString(item.machines)}</div>
-                      <div><strong>Topics:</strong> {getTopicsString(item.topics)}</div>
-                      <div><strong>Location:</strong> {getLocationString(item)}</div>
-                    </div>
-                  </div>
-                </div>
-                
-                {item.notes && (
-                  <div className="border-t border-gray-200 pt-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Notes:</h4>
-                    <p className="text-sm text-gray-700">{item.notes}</p>
-                  </div>
-                )}
+                    <div><strong>Scheduled Date:</strong> {formatDate(item.scheduled_date)}</div>
+                     <div><strong>Status:</strong> <span className={`font-medium ${getStatusColor(item)} capitalize`}>{getTaskStatus(item)}</span></div>
+                     <div><strong>Frequency:</strong> <span className={`font-medium ${getFrequencyColor(item.frequency)} capitalize`}>{item.frequency}</span></div>
+                   </div>
+                 </div>
+                 <div>
+                   <div className="space-y-2 text-sm">
+                     <div><strong>Machines:</strong> {getMachinesString(item.machines)}</div>
+                     <div><strong>Topics:</strong> {getTopicsString(item.topics)}</div>
+                     <div><strong>Location:</strong> {getLocationString(item)}</div>
+                   </div>
+                 </div>
+               </div>
+               
+               {item.notes && (
+                 <div className="border-t border-gray-200 pt-4">
+                   <h4 className="font-medium text-gray-900 mb-2">Notes:</h4>
+                   <p className="text-sm text-gray-700">{item.notes}</p>
+                 </div>
+               )}
 
-{includeImages && (item.before_image_url || item.after_image_url) && (
-  <div className="border-t border-gray-200 pt-4 mt-4">
-    <h4 className="font-medium text-gray-900 mb-3">Images:</h4>
-    <div className="image-grid">
-      {item.before_image_url && (() => {
-        try {
-          const imageUrl = getImageUrl(item.before_image_url);
-          return imageUrl ? (
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Before:</p>
-              <img 
-                src={imageUrl} 
-                alt="Before maintenance"
-                className="w-full h-auto rounded-lg border border-gray-300"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </div>
-          ) : null;
-        } catch (error) {
-          console.warn('Failed to load before image:', error);
-          return null;
-        }
-      })()}
-      {item.after_image_url && (() => {
-        try {
-          const imageUrl = getImageUrl(item.after_image_url);
-          return imageUrl ? (
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">After:</p>
-              <img 
-                src={imageUrl} 
-                alt="After maintenance"
-                className="w-full h-auto rounded-lg border border-gray-300"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </div>
-          ) : null;
-        } catch (error) {
-          console.warn('Failed to load after image:', error);
-          return null;
-        }
-      })()}
-    </div>
-  </div>
-)}
-              </div>
-            ))}
-          </div>
-        )}
+               {includeImages && (item.before_image_url || item.after_image_url) && (
+                 <div className="border-t border-gray-200 pt-4 mt-4">
+                   <h4 className="font-medium text-gray-900 mb-3">Images:</h4>
+                   <div className="image-grid">
+                     {item.before_image_url && getSafeImageUrl(item.before_image_url) && (
+                       <div>
+                         <p className="text-sm font-medium text-gray-700 mb-2">Before:</p>
+                         <img 
+                           src={getSafeImageUrl(item.before_image_url)} 
+                           alt="Before maintenance"
+                           className="w-full h-auto rounded-lg border border-gray-300"
+                           onError={(e) => {
+                             e.currentTarget.style.display = 'none';
+                           }}
+                         />
+                       </div>
+                     )}
+                     {item.after_image_url && getSafeImageUrl(item.after_image_url) && (
+                       <div>
+                         <p className="text-sm font-medium text-gray-700 mb-2">After:</p>
+                         <img 
+                           src={getSafeImageUrl(item.after_image_url)} 
+                           alt="After maintenance"
+                           className="w-full h-auto rounded-lg border border-gray-300"
+                           onError={(e) => {
+                             e.currentTarget.style.display = 'none';
+                           }}
+                         />
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               )}
+             </div>
+           ))}
+         </div>
+       )}
 
-        {/* Footer */}
-        <div className="border-t border-gray-300 pt-4 text-center text-sm text-gray-500">
-          <p>This report was automatically generated by the Facility Management System</p>
-          <p>© 2025 - Confidential and Proprietary Information</p>
+       {/* Footer */}
+       <div className="border-t border-gray-300 pt-4 text-center text-sm text-gray-500">
+         <p>This report was automatically generated by the Facility Management System</p>
+         <p>© 2025 - Confidential and Proprietary Information</p>
        </div>
      </div>
 
@@ -701,3 +762,4 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
 };
 
 export default PDFMaintenanceGenerator;
+                  
