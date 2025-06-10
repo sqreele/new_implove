@@ -22,7 +22,7 @@ export interface SearchParams {
   end_date?: string;
   property_id?: string;
   topic_id?: string;
-  machine_id?: string;
+  machine_id?: string; // This is already present in your original code
 }
 
 // Using the exact same interface from the service layer for consistency

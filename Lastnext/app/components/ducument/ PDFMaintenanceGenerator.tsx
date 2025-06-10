@@ -1,77 +1,59 @@
-//app/components/ducument/PDFMaintenanceGenerator.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  PDFDownloadLink, 
-  PDFViewer,
-  pdf,
-  BlobProvider
-} from '@react-pdf/renderer';
+// Update your PDFMaintenanceGenerator component to accept initial filters
+
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   FileText, 
   Download, 
-  Eye, 
+  Calendar, 
+  Clock, 
+  CheckCircle, 
+  AlertCircle, 
   Filter,
+  Printer,
   Building,
   Settings,
-  ArrowLeft,
-  Loader2,
-  CheckCircle2,
-  Upload,
-  Image as ImageIcon,
-  X,
   Camera,
-  AlertCircle,
-  Plus,
-  Trash2
+  ArrowLeft
 } from 'lucide-react';
 import { 
   PreventiveMaintenance, 
   MachineDetails,
   Topic,
-  determinePMStatus 
+  determinePMStatus,
+  getImageUrl 
 } from '@/app/lib/preventiveMaintenanceModels';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext';
-import { FilterState } from '@/app/lib/FilterContext';
-import MaintenancePDFDocument from '@/app/components/pdf/MaintenancePDFDocument';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-// Image-related interfaces
-interface MaintenanceImage {
-  id: string;
-  url: string;
-  type: 'before' | 'after';
-  caption?: string;
-  timestamp?: string;
-  file?: File;
-  taskId?: string;
-}
-
-interface PreventiveMaintenanceWithImages extends PreventiveMaintenance {
-  images?: MaintenanceImage[];
-  before_images?: MaintenanceImage[];
-  after_images?: MaintenanceImage[];
+interface InitialFilters {
+  status: string;
+  frequency: string;
+  search: string;
+  startDate: string;
+  endDate: string;
+  machineId: string; // Added machine filter
+  page: number;
+  pageSize: number;
 }
 
 interface PDFMaintenanceGeneratorProps {
-  initialFilters?: FilterState;
-}
-
-interface ImageUploadState {
-  isUploading: boolean;
-  progress: number;
-  error?: string;
+  initialFilters?: InitialFilters;
 }
 
 const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({ 
   initialFilters 
 }) => {
+  const router = useRouter();
+  
   // Get maintenance data from context
   const { maintenanceItems, fetchMaintenanceItems } = usePreventiveMaintenance();
   const maintenanceData = maintenanceItems || [];
   
-  // Initialize filters with context values or defaults
+  // Initialize filters with URL parameters or defaults
   const [filterStatus, setFilterStatus] = useState(initialFilters?.status || 'all');
   const [filterFrequency, setFilterFrequency] = useState(initialFilters?.frequency || 'all');
+  const [filterMachine, setFilterMachine] = useState(initialFilters?.machineId || 'all'); // Added machine filter state
   const [dateRange, setDateRange] = useState({ 
     start: initialFilters?.startDate || '', 
     end: initialFilters?.endDate || '' 
@@ -80,30 +62,39 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
   const [includeCompleted, setIncludeCompleted] = useState(true);
   const [includeDetails, setIncludeDetails] = useState(true);
   const [includeImages, setIncludeImages] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [pdfTitle, setPdfTitle] = useState('Preventive Maintenance Report');
+  const printRef = useRef(null);
 
-  // Image management states
-  const [taskImages, setTaskImages] = useState<Map<string, MaintenanceImage[]>>(new Map());
-  const [selectedTaskForImages, setSelectedTaskForImages] = useState<string | null>(null);
-  const [showImageManager, setShowImageManager] = useState(false);
-  const [imageUploadState, setImageUploadState] = useState<ImageUploadState>({
-    isUploading: false,
-    progress: 0
-  });
-  const [imagePreviewMode, setImagePreviewMode] = useState<'before' | 'after' | 'all'>('all');
+  // Get unique machines from the data for the filter dropdown
+  const getUniqueMachines = () => {
+    const machines = new Set<string>();
+    maintenanceData.forEach(item => {
+      if (item.machines && item.machines.length > 0) {
+        item.machines.forEach(machine => {
+          if (typeof machine === 'string') {
+            machines.add(machine);
+          } else {
+            const name = machine.name || machine.machine_id;
+            if (name) machines.add(name);
+          }
+        });
+      }
+    });
+    return Array.from(machines).sort();
+  };
 
   // Fetch data with initial filters when component mounts
   useEffect(() => {
     const loadData = async () => {
       if (initialFilters) {
+        // Apply initial filters to context
         await fetchMaintenanceItems({
           status: initialFilters.status,
           frequency: initialFilters.frequency,
           search: initialFilters.search,
           start_date: initialFilters.startDate,
           end_date: initialFilters.endDate,
+          machine_id: initialFilters.machineId, // Added machine filter
           page: initialFilters.page,
           page_size: initialFilters.pageSize
         });
@@ -119,309 +110,46 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     return determinePMStatus(item);
   };
 
-  // ===================
-  // IMAGE HELPER FUNCTIONS
-  // ===================
-
-  /**
-   * Validates if a file is a valid image
-   */
-  const validateImageFile = (file: File): { isValid: boolean; error?: string } => {
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const getTopicsString = (topics: Topic[] | number[] | null | undefined) => {
+    if (!topics || topics.length === 0) return 'No topics';
     
-    if (!allowedTypes.includes(file.type)) {
-      return { isValid: false, error: 'Invalid file type. Please upload JPEG, PNG, or WebP images.' };
+    if (typeof topics[0] === 'object' && 'title' in topics[0]) {
+      return (topics as Topic[]).map(topic => topic.title).join(', ');
     }
     
-    if (file.size > maxSize) {
-      return { isValid: false, error: 'File too large. Please upload images smaller than 10MB.' };
+    return (topics as number[]).join(', ');
+  };
+
+  const getMachinesString = (machines: Array<MachineDetails | string> | null | undefined) => {
+    if (!machines || machines.length === 0) return 'No machines assigned';
+    
+    return machines.map(machine => {
+      if (typeof machine === 'string') {
+        return machine;
+      }
+      
+      const machineWithLocation = machine as any;
+      const name = machine.name || machine.machine_id;
+      const location = machineWithLocation.location ? ` (${machineWithLocation.location})` : '';
+      
+      return `${name}${location}`;
+    }).join(', ');
+  };
+
+  const getLocationString = (item: PreventiveMaintenance) => {
+    if (item.machines && item.machines.length > 0) {
+      const firstMachine = item.machines[0];
+      
+      if (typeof firstMachine === 'string') {
+        return firstMachine;
+      }
+      
+      const machineWithLocation = firstMachine as any;
+      return machineWithLocation.location || firstMachine.machine_id || 'Unknown';
     }
     
-    return { isValid: true };
+    return item.property_id || 'Unknown';
   };
-
-  /**
-   * Converts a file to base64 data URL for PDF embedding
-   */
-  const fileToDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
-  /**
-   * Resizes an image to optimize for PDF generation
-   */
-  const resizeImage = (file: File, maxWidth: number = 800, quality: number = 0.8): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      
-      img.onload = () => {
-        // Calculate new dimensions
-        const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
-        const newWidth = img.width * ratio;
-        const newHeight = img.height * ratio;
-        
-        canvas.width = newWidth;
-        canvas.height = newHeight;
-        
-        // Draw and compress
-        ctx?.drawImage(img, 0, 0, newWidth, newHeight);
-        const dataURL = canvas.toDataURL('image/jpeg', quality);
-        resolve(dataURL);
-      };
-      
-      img.onerror = reject;
-      img.src = URL.createObjectURL(file);
-    });
-  };
-
-  /**
-   * Adds before images to a maintenance task
-   */
-  const addBeforeImages = useCallback(async (taskId: string, files: File[]): Promise<MaintenanceImage[]> => {
-    const newImages: MaintenanceImage[] = [];
-    
-    for (const file of files) {
-      const validation = validateImageFile(file);
-      if (!validation.isValid) {
-        throw new Error(validation.error);
-      }
-      
-      try {
-        const dataURL = await resizeImage(file);
-        const newImage: MaintenanceImage = {
-          id: `before_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          url: dataURL,
-          type: 'before',
-          caption: `Before maintenance - ${file.name}`,
-          timestamp: new Date().toISOString(),
-          file,
-          taskId
-        };
-        newImages.push(newImage);
-      } catch (error) {
-        console.error('Error processing before image:', error);
-        throw new Error(`Failed to process image: ${file.name}`);
-      }
-    }
-    
-    return newImages;
-  }, []);
-
-  /**
-   * Adds after images to a maintenance task
-   */
-  const addAfterImages = useCallback(async (taskId: string, files: File[]): Promise<MaintenanceImage[]> => {
-    const newImages: MaintenanceImage[] = [];
-    
-    for (const file of files) {
-      const validation = validateImageFile(file);
-      if (!validation.isValid) {
-        throw new Error(validation.error);
-      }
-      
-      try {
-        const dataURL = await resizeImage(file);
-        const newImage: MaintenanceImage = {
-          id: `after_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          url: dataURL,
-          type: 'after',
-          caption: `After maintenance - ${file.name}`,
-          timestamp: new Date().toISOString(),
-          file,
-          taskId
-        };
-        newImages.push(newImage);
-      } catch (error) {
-        console.error('Error processing after image:', error);
-        throw new Error(`Failed to process image: ${file.name}`);
-      }
-    }
-    
-    return newImages;
-  }, []);
-
-  /**
-   * Handles image upload with progress tracking
-   */
-  const handleImageUpload = async (taskId: string, files: File[], type: 'before' | 'after') => {
-    setImageUploadState({ isUploading: true, progress: 0 });
-    
-    try {
-      let newImages: MaintenanceImage[];
-      
-      if (type === 'before') {
-        newImages = await addBeforeImages(taskId, files);
-      } else {
-        newImages = await addAfterImages(taskId, files);
-      }
-      
-      // Update task images
-      setTaskImages(prev => {
-        const current = prev.get(taskId) || [];
-        const updated = [...current, ...newImages];
-        const newMap = new Map(prev);
-        newMap.set(taskId, updated);
-        return newMap;
-      });
-      
-      setImageUploadState({ isUploading: false, progress: 100 });
-      
-      // Clear upload state after delay
-      setTimeout(() => {
-        setImageUploadState({ isUploading: false, progress: 0 });
-      }, 1000);
-      
-    } catch (error) {
-      setImageUploadState({ 
-        isUploading: false, 
-        progress: 0, 
-        error: error instanceof Error ? error.message : 'Upload failed' 
-      });
-      
-      // Clear error after delay
-      setTimeout(() => {
-        setImageUploadState({ isUploading: false, progress: 0 });
-      }, 3000);
-    }
-  };
-
-  /**
-   * Removes an image from a task
-   */
-  const removeImage = (taskId: string, imageId: string) => {
-    setTaskImages(prev => {
-      const current = prev.get(taskId) || [];
-      const updated = current.filter(img => img.id !== imageId);
-      const newMap = new Map(prev);
-      
-      if (updated.length === 0) {
-        newMap.delete(taskId);
-      } else {
-        newMap.set(taskId, updated);
-      }
-      
-      return newMap;
-    });
-  };
-
-  /**
-   * Updates image caption
-   */
-  const updateImageCaption = (taskId: string, imageId: string, caption: string) => {
-    setTaskImages(prev => {
-      const current = prev.get(taskId) || [];
-      const updated = current.map(img => 
-        img.id === imageId ? { ...img, caption } : img
-      );
-      const newMap = new Map(prev);
-      newMap.set(taskId, updated);
-      return newMap;
-    });
-  };
-
-  /**
-   * Gets all before images for a task
-   */
-  const getBeforeImages = (taskId: string): MaintenanceImage[] => {
-    const images = taskImages.get(taskId) || [];
-    return images.filter(img => img.type === 'before');
-  };
-
-  /**
-   * Gets all after images for a task
-   */
-  const getAfterImages = (taskId: string): MaintenanceImage[] => {
-    const images = taskImages.get(taskId) || [];
-    return images.filter(img => img.type === 'after');
-  };
-
-  /**
-   * Checks if a task has any images
-   */
-  const taskHasImages = (taskId: string): boolean => {
-    const images = taskImages.get(taskId) || [];
-    return images.length > 0;
-  };
-
-  /**
-   * Gets image statistics for all tasks
-   */
-  const getImageStatistics = () => {
-    let totalImages = 0;
-    let tasksWithImages = 0;
-    let beforeImagesCount = 0;
-    let afterImagesCount = 0;
-    
-    taskImages.forEach((images, taskId) => {
-      if (images.length > 0) {
-        tasksWithImages++;
-        totalImages += images.length;
-        beforeImagesCount += images.filter(img => img.type === 'before').length;
-        afterImagesCount += images.filter(img => img.type === 'after').length;
-      }
-    });
-    
-    return {
-      totalImages,
-      tasksWithImages,
-      beforeImagesCount,
-      afterImagesCount
-    };
-  };
-
-  /**
-   * Bulk removes all images for a task
-   */
-  const clearTaskImages = (taskId: string) => {
-    setTaskImages(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(taskId);
-      return newMap;
-    });
-  };
-
-  /**
-   * Exports images for a task (useful for backup) - requires JSZip library
-   */
-  const exportTaskImages = async (taskId: string) => {
-    const images = taskImages.get(taskId) || [];
-    if (images.length === 0) {
-      alert('No images to export for this task');
-      return;
-    }
-    
-    // Simple export without zip - download each image individually
-    const task = filteredData.find(item => item.pm_id === taskId);
-    const taskName = task?.pmtitle || 'maintenance';
-    
-    for (const image of images) {
-      if (image.url) {
-        const link = document.createElement('a');
-        link.href = image.url;
-        link.download = `${taskId}_${taskName}_${image.type}_${image.id}.jpg`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Small delay between downloads
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }
-    
-    alert(`Exported ${images.length} images for task ${taskId}`);
-  };
-
-  // ===================
-  // END IMAGE FUNCTIONS
-  // ===================
 
   // Client-side filtering (for PDF display only)
   const filteredData = maintenanceData.filter((item: PreventiveMaintenance) => {
@@ -429,11 +157,23 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     const statusMatch = filterStatus === 'all' || actualStatus === filterStatus;
     const frequencyMatch = filterFrequency === 'all' || item.frequency === filterFrequency;
     
-    // Search filter
+    // Machine filter
+    const machineMatch = filterMachine === 'all' || 
+      (item.machines && item.machines.some(machine => {
+        if (typeof machine === 'string') {
+          return machine === filterMachine;
+        } else {
+          const name = machine.name || machine.machine_id;
+          return name === filterMachine;
+        }
+      }));
+    
+    // Search filter (now includes machine search)
     const searchMatch = !searchTerm || 
       item.pmtitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.pm_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+      item.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getMachinesString(item.machines).toLowerCase().includes(searchTerm.toLowerCase());
     
     let dateMatch = true;
     if (dateRange.start && dateRange.end) {
@@ -445,94 +185,125 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     
     const completedMatch = includeCompleted || actualStatus !== 'completed';
     
-    return statusMatch && frequencyMatch && dateMatch && completedMatch && searchMatch;
+    return statusMatch && frequencyMatch && machineMatch && dateMatch && completedMatch && searchMatch;
   });
 
-  // Transform filtered data to include images
-  const dataWithImages: PreventiveMaintenanceWithImages[] = filteredData.map(item => ({
-    ...item,
-    before_images: getBeforeImages(item.pm_id),
-    after_images: getAfterImages(item.pm_id),
-    images: taskImages.get(item.pm_id) || []
-  }));
-
-  // Prepare applied filters for PDF
-  const appliedFilters = {
-    status: filterStatus !== 'all' ? filterStatus : '',
-    frequency: filterFrequency !== 'all' ? filterFrequency : '',
-    search: searchTerm,
-    startDate: dateRange.start,
-    endDate: dateRange.end
+  // Format date for display
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  // Check if any filters are active
-  const hasActiveFilters = initialFilters && [
-    initialFilters.status,
-    initialFilters.frequency,
-    initialFilters.search,
-    initialFilters.startDate,
-    initialFilters.endDate
-  ].some(filter => filter !== '');
+  // Get status color
+  const getStatusColor = (item: PreventiveMaintenance) => {
+    const status = getTaskStatus(item);
+    switch (status) {
+      case 'completed': return 'text-green-600';
+      case 'pending': return 'text-yellow-600';
+      case 'overdue': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
 
-  // Get image statistics
-  const imageStats = getImageStatistics();
+  // Get frequency color for visual distinction
+  const getFrequencyColor = (frequency: string) => {
+    switch (frequency) {
+      case 'daily': return 'text-blue-600';
+      case 'weekly': return 'text-green-600';
+      case 'monthly': return 'text-yellow-600';
+      case 'quarterly': return 'text-orange-600';
+      case 'yearly': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
 
-  // Generate PDF blob for download
-  const generatePDFBlob = async () => {
-    const doc = (
-      <MaintenancePDFDocument
-        data={dataWithImages}
-        appliedFilters={appliedFilters}
-        includeDetails={includeDetails}
-        includeImages={includeImages}
-        title={pdfTitle}
-      />
-    );
+  // Generate PDF (browser print functionality)
+  const generatePDF = () => {
+    window.print();
+  };
+
+  // Download as HTML file
+  const downloadHTML = () => {
+    const htmlContent = document.getElementById('pdf-content')?.outerHTML;
+    if (!htmlContent) return;
     
-    const blob = await pdf(doc).toBlob();
-    return blob;
+    const fullHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Preventive Maintenance List</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #ccc; padding-bottom: 20px; }
+          .summary { margin-bottom: 30px; background: #f9f9f9; padding: 15px; border-radius: 8px; }
+          .maintenance-item { margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
+          .text-green-600 { color: #16a34a; }
+          .text-yellow-600 { color: #ca8a04; }
+          .text-red-600 { color: #dc2626; }
+          .text-blue-600 { color: #2563eb; }
+          .text-orange-600 { color: #ea580c; }
+          .text-gray-600 { color: #4b5563; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          .grid { display: grid; gap: 16px; }
+          .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+          .grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+          .font-medium { font-weight: 500; }
+          .font-semibold { font-weight: 600; }
+          .font-bold { font-weight: bold; }
+          .text-sm { font-size: 14px; }
+          .text-lg { font-size: 18px; }
+          .text-xl { font-size: 20px; }
+          .text-2xl { font-size: 24px; }
+          .text-3xl { font-size: 30px; }
+          .mb-2 { margin-bottom: 8px; }
+          .mb-3 { margin-bottom: 12px; }
+          .mb-4 { margin-bottom: 16px; }
+          .mt-1 { margin-top: 4px; }
+          .mt-3 { margin-top: 12px; }
+          .mt-4 { margin-top: 16px; }
+          .pt-3 { padding-top: 12px; }
+          .border-t { border-top: 1px solid #e5e7eb; }
+          .capitalize { text-transform: capitalize; }
+          .text-center { text-align: center; }
+          img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd; }
+          .image-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+          @media print {
+            body { margin: 0; font-size: 12px; }
+            .no-print { display: none !important; }
+            .maintenance-item { page-break-inside: avoid; }
+            img { max-height: 150px; }
+          }
+          @media screen and (max-width: 768px) {
+            .grid-cols-4 { grid-template-columns: repeat(2, 1fr); }
+            .grid-cols-2 { grid-template-columns: 1fr; }
+            th, td { font-size: 11px; padding: 4px; }
+          }
+        </style>
+      </head>
+      <body>
+        ${htmlContent}
+      </body>
+      </html>
+    `;
+    
+    const blob = new Blob([fullHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `preventive-maintenance-list-${new Date().toISOString().split('T')[0]}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
-
-  // Manual download function
-  const handleManualDownload = async () => {
-    try {
-      const blob = await generatePDFBlob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${pdfTitle.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Error generating PDF. Please try again.');
-    }
-  };
-
-  // File input handler
-  const handleFileInput = (taskId: string, type: 'before' | 'after') => (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      handleImageUpload(taskId, Array.from(files), type);
-    }
-  };
-
-  // Create the PDF document element
-  const pdfDocument = (
-    <MaintenancePDFDocument
-      data={dataWithImages}
-      appliedFilters={appliedFilters}
-      
-      includeDetails={includeDetails}
-      includeImages={includeImages}
-      title={pdfTitle}
-    />
-  );
-
-  // Generate filename
-  const fileName = `${pdfTitle.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
 
   if (isLoading) {
     return (
@@ -545,8 +316,8 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      {/* Controls Section */}
-      <div className="mb-8 bg-white rounded-lg shadow-md p-6">
+      {/* Controls Section - Hidden in print */}
+      <div className="no-print mb-8 bg-white rounded-lg shadow-md p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
             <Link
@@ -561,111 +332,41 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
               Generate Maintenance PDF Report
             </h1>
           </div>
-          
           <div className="flex space-x-3">
             <button
-              onClick={() => setShowImageManager(!showImageManager)}
-              className={`flex items-center px-4 py-2 border rounded-lg transition-colors ${
-                showImageManager 
-                  ? 'bg-purple-50 border-purple-200 text-purple-700' 
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <ImageIcon className="h-4 w-4 mr-2" />
-              {showImageManager ? 'Hide Images' : 'Manage Images'}
-            </button>
-
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className={`flex items-center px-4 py-2 border rounded-lg transition-colors ${
-                showPreview 
-                  ? 'bg-blue-50 border-blue-200 text-blue-700' 
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              {showPreview ? 'Hide Preview' : 'Show Preview'}
-            </button>
-
-            {/* Fixed PDFDownloadLink with proper typing */}
-            <BlobProvider document={pdfDocument}>
-              {({ blob, url, loading, error }) => {
-                return (
-                  <a
-                    href={url || '#'}
-                    download={fileName}
-                    className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-                      loading || error
-                        ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-green-600 hover:bg-green-700'
-                    } text-white`}
-                    onClick={(e) => {
-                      if (loading || error || !url) {
-                        e.preventDefault();
-                      }
-                    }}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating PDF...
-                      </>
-                    ) : error ? (
-                      <>
-                        <FileText className="h-4 w-4 mr-2" />
-                        Error
-                      </>
-                    ) : (
-                      <>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download PDF
-                      </>
-                    )}
-                  </a>
-                );
-              }}
-            </BlobProvider>
-
-            <button
-              onClick={handleManualDownload}
+              onClick={generatePDF}
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
+              <Printer className="h-4 w-4 mr-2" />
+              Print PDF
+            </button>
+            <button
+              onClick={downloadHTML}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
               <Download className="h-4 w-4 mr-2" />
-              Download Now
+              Download HTML
             </button>
           </div>
         </div>
 
-        {/* PDF Title Input */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            PDF Report Title
-          </label>
-          <input
-            type="text"
-            value={pdfTitle}
-            onChange={(e) => setPdfTitle(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter PDF title..."
-          />
-        </div>
-
-        {/* Show applied filters from context */}
-        {hasActiveFilters && (
+        {/* Show applied filters */}
+        {initialFilters && (
           <div className="mb-6 p-4 bg-blue-50 rounded-lg">
             <h3 className="font-medium text-blue-900 mb-2">Applied Filters from Main Page:</h3>
             <div className="text-sm text-blue-800 space-y-1">
-              {initialFilters!.status && <div>Status: <span className="font-medium capitalize">{initialFilters!.status}</span></div>}
-              {initialFilters!.frequency && <div>Frequency: <span className="font-medium capitalize">{initialFilters!.frequency}</span></div>}
-              {initialFilters!.search && <div>Search: <span className="font-medium">"{initialFilters!.search}"</span></div>}
-              {initialFilters!.startDate && <div>Start Date: <span className="font-medium">{initialFilters!.startDate}</span></div>}
-              {initialFilters!.endDate && <div>End Date: <span className="font-medium">{initialFilters!.endDate}</span></div>}
+              {initialFilters.status && <div>Status: <span className="font-medium capitalize">{initialFilters.status}</span></div>}
+              {initialFilters.frequency && <div>Frequency: <span className="font-medium capitalize">{initialFilters.frequency}</span></div>}
+              {initialFilters.machineId && <div>Machine: <span className="font-medium">{initialFilters.machineId}</span></div>}
+              {initialFilters.search && <div>Search: <span className="font-medium">"{initialFilters.search}"</span></div>}
+              {initialFilters.startDate && <div>Start Date: <span className="font-medium">{initialFilters.startDate}</span></div>}
+              {initialFilters.endDate && <div>End Date: <span className="font-medium">{initialFilters.endDate}</span></div>}
             </div>
           </div>
         )}
 
         {/* Additional Filters for PDF */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Override Status Filter</label>
             <select
@@ -697,6 +398,31 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Override Machine Filter</label>
+            <select
+              value={filterMachine}
+              onChange={(e) => setFilterMachine(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Machines</option>
+              {getUniqueMachines().map(machine => (
+                <option key={machine} value={machine}>{machine}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Override Search</label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search tasks..."
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Override Start Date</label>
             <input
               type="date"
@@ -717,332 +443,261 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
           </div>
         </div>
 
-        {/* Search Override */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Override Search Term</label>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search maintenance tasks..."
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        {/* Options */}
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={includeCompleted}
+              onChange={(e) => setIncludeCompleted(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 mr-2"
+            />
+            Include Completed Tasks
+          </label>
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={includeDetails}
+              onChange={(e) => setIncludeDetails(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 mr-2"
+            />
+            Include Detailed Descriptions
+          </label>
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={includeImages}
+              onChange={(e) => setIncludeImages(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 mr-2"
+            />
+            Include Before/After Images
+          </label>
         </div>
-
-        {/* PDF Options */}
-        <div className="mb-6">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">PDF Options</h3>
-          <div className="flex flex-wrap gap-4">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={includeCompleted}
-                onChange={(e) => setIncludeCompleted(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 mr-2"
-              />
-              Include Completed Tasks
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={includeDetails}
-                onChange={(e) => setIncludeDetails(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 mr-2"
-              />
-              Include Detailed Descriptions
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={includeImages}
-                onChange={(e) => setIncludeImages(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 mr-2"
-              />
-              Include Before/After Images
-            </label>
-          </div>
-        </div>
-
-        {/* Image Statistics */}
-        {includeImages && imageStats.totalImages > 0 && (
-          <div className="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-            <h3 className="font-medium text-purple-900 mb-2">Image Statistics:</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div className="text-purple-800">
-                <span className="font-medium">{imageStats.totalImages}</span> Total Images
-              </div>
-              <div className="text-purple-800">
-                <span className="font-medium">{imageStats.tasksWithImages}</span> Tasks with Images
-              </div>
-              <div className="text-purple-800">
-                <span className="font-medium">{imageStats.beforeImagesCount}</span> Before Images
-              </div>
-              <div className="text-purple-800">
-                <span className="font-medium">{imageStats.afterImagesCount}</span> After Images
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Data Status */}
-        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-          <div className="flex items-center">
-            <CheckCircle2 className="h-5 w-5 text-green-600 mr-2" />
-            <p className="text-sm text-green-800">
-              <strong>Ready to Generate:</strong> Found {maintenanceData.length} total maintenance records, 
-              showing {filteredData.length} after filters
-              {includeImages && ` (${imageStats.tasksWithImages} with images)`}
-            </p>
-          </div>
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Data Status:</strong> Found {maintenanceData.length} total maintenance records, 
+            showing {filteredData.length} after filters
+            {maintenanceData.length === 0 && " - No data available. Make sure maintenance records are loaded."}
+          </p>
         </div>
       </div>
 
-      {/* Image Manager */}
-      {showImageManager && (
-        <div className="mb-8 bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center">
-              <Camera className="h-5 w-5 mr-2 text-purple-600" />
-              Before/After Image Manager
+      {/* PDF Content */}
+      <div id="pdf-content" ref={printRef} className="bg-white">
+        {/* Header */}
+        <div className="header text-center mb-8 border-b-2 border-gray-300 pb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Preventive Maintenance Report</h1>
+          <p className="text-gray-600">Generated on {new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}</p>
+          <div className="flex justify-center items-center mt-4 text-sm text-gray-500">
+            <Building className="h-4 w-4 mr-2" />
+            Facility Management System
+          </div>
+        </div>
+
+        {/* Summary Statistics */}
+        <div className="summary mb-8 bg-gray-50 p-6 rounded-lg">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <Settings className="h-5 w-5 mr-2" />
+            Summary Statistics
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{filteredData.length}</div>
+              <div className="text-sm text-gray-600">Total Tasks</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {filteredData.filter(item => getTaskStatus(item) === 'completed').length}
+              </div>
+              <div className="text-sm text-gray-600">Completed</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600">
+                {filteredData.filter(item => getTaskStatus(item) === 'pending').length}
+              </div>
+              <div className="text-sm text-gray-600">Pending</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-600">
+                {filteredData.filter(item => getTaskStatus(item) === 'overdue').length}
+              </div>
+              <div className="text-sm text-gray-600">Overdue</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Maintenance Tasks Table */}
+        {filteredData.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              Maintenance Tasks
             </h2>
             
-            <div className="flex items-center space-x-4">
-              <select
-                value={imagePreviewMode}
-                onChange={(e) => setImagePreviewMode(e.target.value as 'before' | 'after' | 'all')}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              >
-                <option value="all">All Images</option>
-                <option value="before">Before Only</option>
-                <option value="after">After Only</option>
-              </select>
-            </div>
+            <table className="w-full border-collapse border border-gray-300">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border border-gray-300 px-4 py-3 text-left">Task ID</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left">Title</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left">Scheduled Date</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left">Status</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left">Frequency</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left">Machines</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left">Topics</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left">Location</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredData.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="border border-gray-300 px-4 py-3 font-mono text-sm">{item.pm_id}</td>
+                    <td className="border border-gray-300 px-4 py-3 font-medium">
+                      {item.pmtitle || 'No title'}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-3">{formatDate(item.scheduled_date)}</td>
+                    <td className={`border border-gray-300 px-4 py-3 font-medium ${getStatusColor(item)}`}>
+                      <span className="capitalize">{getTaskStatus(item)}</span>
+                    </td>
+                    <td className={`border border-gray-300 px-4 py-3 font-medium ${getFrequencyColor(item.frequency)}`}>
+                      <span className="capitalize">{item.frequency}</span>
+                    </td>
+                    <td className="border border-gray-300 px-4 py-3 text-sm">
+                      {getMachinesString(item.machines)}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-3 text-sm">
+                      {getTopicsString(item.topics)}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-3 text-sm">
+                      {getLocationString(item)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        )}
 
-          {/* Upload Status */}
-          {imageUploadState.isUploading && (
-            <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-center">
-                <Loader2 className="h-4 w-4 text-blue-600 mr-2 animate-spin" />
-                <span className="text-sm text-blue-800">Uploading images... {imageUploadState.progress}%</span>
-              </div>
-            </div>
-          )}
-
-          {imageUploadState.error && (
-            <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
-              <div className="flex items-center">
-                <AlertCircle className="h-4 w-4 text-red-600 mr-2" />
-                <span className="text-sm text-red-800">{imageUploadState.error}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Task List with Image Management */}
-          <div className="space-y-4">
-            {filteredData.map((task) => {
-              const beforeImages = getBeforeImages(task.pm_id);
-              const afterImages = getAfterImages(task.pm_id);
-              const hasTaskImages = taskHasImages(task.pm_id);
-
-              return (
-                <div key={task.pm_id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="font-medium text-gray-900">{task.pmtitle || 'No title'}</h3>
-                      <p className="text-sm text-gray-600">ID: {task.pm_id}</p>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-500">
-                        {beforeImages.length}B / {afterImages.length}A
-                      </span>
-                      
-                      {hasTaskImages && (
-                        <>
-                          <button
-                            onClick={() => exportTaskImages(task.pm_id)}
-                            className="text-blue-600 hover:text-blue-800 p-1 mr-2"
-                            title="Export images"
-                          >
-                            <Download className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => clearTaskImages(task.pm_id)}
-                            className="text-red-600 hover:text-red-800 p-1"
-                            title="Clear all images"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </>
-                      )}
+        {/* Detailed View Section */}
+        {includeDetails && filteredData.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-6 flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              Detailed Task Information
+            </h2>
+            
+            {filteredData.map((item) => (
+              <div key={item.id} className="maintenance-item mb-6 border border-gray-300 rounded-lg p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      {item.pmtitle || 'No title'} ({item.pm_id})
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <div><strong>Scheduled Date:</strong> {formatDate(item.scheduled_date)}</div>
+                      <div><strong>Status:</strong> <span className={`font-medium ${getStatusColor(item)} capitalize`}>{getTaskStatus(item)}</span></div>
+                      <div><strong>Frequency:</strong> <span className={`font-medium ${getFrequencyColor(item.frequency)} capitalize`}>{item.frequency}</span></div>
                     </div>
                   </div>
-
-                  {/* Image Upload Buttons */}
-                  <div className="flex space-x-4 mb-4">
-                    <div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleFileInput(task.pm_id, 'before')}
-                        className="hidden"
-                        id={`before-${task.pm_id}`}
-                      />
-                      <label
-                        htmlFor={`before-${task.pm_id}`}
-                        className="flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm cursor-pointer hover:bg-gray-50"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Before Images
-                      </label>
-                    </div>
-                    
-                    <div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleFileInput(task.pm_id, 'after')}
-                        className="hidden"
-                        id={`after-${task.pm_id}`}
-                      />
-                      <label
-                        htmlFor={`after-${task.pm_id}`}
-                        className="flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm cursor-pointer hover:bg-gray-50"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add After Images
-                      </label>
+                  <div>
+                    <div className="space-y-2 text-sm">
+                      <div><strong>Machines:</strong> {getMachinesString(item.machines)}</div>
+                      <div><strong>Topics:</strong> {getTopicsString(item.topics)}</div>
+                      <div><strong>Location:</strong> {getLocationString(item)}</div>
                     </div>
                   </div>
-
-                  {/* Image Gallery */}
-                  {hasTaskImages && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Before Images */}
-                      {(imagePreviewMode === 'all' || imagePreviewMode === 'before') && beforeImages.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Before Images ({beforeImages.length})</h4>
-                          <div className="space-y-2">
-                            {beforeImages.map((image) => (
-                              <div key={image.id} className="relative border border-gray-200 rounded-lg overflow-hidden">
-                                <img 
-                                  src={image.url} 
-                                  alt={image.caption || 'Before image'}
-                                  className="w-full h-32 object-cover"
-                                />
-                                <div className="p-2">
-                                  <input
-                                    type="text"
-                                    value={image.caption || ''}
-                                    onChange={(e) => updateImageCaption(task.pm_id, image.id, e.target.value)}
-                                    placeholder="Add caption..."
-                                    className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                                  />
-                                </div>
-                                <button
-                                  onClick={() => removeImage(task.pm_id, image.id)}
-                                  className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* After Images */}
-                      {(imagePreviewMode === 'all' || imagePreviewMode === 'after') && afterImages.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">After Images ({afterImages.length})</h4>
-                          <div className="space-y-2">
-                            {afterImages.map((image) => (
-                              <div key={image.id} className="relative border border-gray-200 rounded-lg overflow-hidden">
-                                <img 
-                                  src={image.url} 
-                                  alt={image.caption || 'After image'}
-                                  className="w-full h-32 object-cover"
-                                />
-                                <div className="p-2">
-                                  <input
-                                    type="text"
-                                    value={image.caption || ''}
-                                    onChange={(e) => updateImageCaption(task.pm_id, image.id, e.target.value)}
-                                    placeholder="Add caption..."
-                                    className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                                  />
-                                </div>
-                                <button
-                                  onClick={() => removeImage(task.pm_id, image.id)}
-                                  className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {!hasTaskImages && (
-                    <div className="text-center py-4 text-gray-500 text-sm">
-                      No images uploaded for this task
-                    </div>
-                  )}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                
+                {item.notes && (
+                  <div className="border-t border-gray-200 pt-4">
+                    <h4 className="font-medium text-gray-900 mb-2">Notes:</h4>
+                    <p className="text-sm text-gray-700">{item.notes}</p>
+                  </div>
+                )}
 
-      {/* PDF Preview */}
-      {showPreview && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-            <Eye className="h-5 w-5 mr-2" />
-            PDF Preview
-          </h2>
-          
-          <div className="border border-gray-200 rounded-lg overflow-hidden" style={{ height: '800px' }}>
-            <PDFViewer
-              style={{ width: '100%', height: '100%' }}
-              showToolbar={true}
-            >
-              {pdfDocument}
-            </PDFViewer>
-          </div>
-          
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">
-              <strong>Preview Note:</strong> This is a live preview of your PDF. 
-              Any changes to filters, options, or images will update the preview automatically. 
-              Use the download buttons above to save the PDF.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* No data message */}
-      {filteredData.length === 0 && (
-        <div className="text-center py-12 bg-white rounded-lg shadow-md">
-          <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No maintenance tasks found</h3>
-          <p className="text-gray-600">
-            {maintenanceData.length === 0 
-              ? "No maintenance data is available. Please ensure maintenance records are loaded."
-              : "Try adjusting your filters to see more results."
-            }
-          </p>
-        </div>
-      )}
+{includeImages && (item.before_image_url || item.after_image_url) && (
+  <div className="border-t border-gray-200 pt-4 mt-4">
+    <h4 className="font-medium text-gray-900 mb-3">Images:</h4>
+    <div className="image-grid">
+      {item.before_image_url && (() => {
+        try {
+          const imageUrl = getImageUrl(item.before_image_url);
+          return imageUrl ? (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Before:</p>
+              <img 
+                src={imageUrl} 
+                alt="Before maintenance"
+                className="w-full h-auto rounded-lg border border-gray-300"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+          ) : null;
+        } catch (error) {
+          console.warn('Failed to load before image:', error);
+          return null;
+        }
+      })()}
+      {item.after_image_url && (() => {
+        try {
+          const imageUrl = getImageUrl(item.after_image_url);
+          return imageUrl ? (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">After:</p>
+              <img 
+                src={imageUrl} 
+                alt="After maintenance"
+                className="w-full h-auto rounded-lg border border-gray-300"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+          ) : null;
+        } catch (error) {
+          console.warn('Failed to load after image:', error);
+          return null;
+        }
+      })()}
     </div>
-  );
+  </div>
+)}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="border-t border-gray-300 pt-4 text-center text-sm text-gray-500">
+          <p>This report was automatically generated by the Facility Management System</p>
+          <p>© 2025 - Confidential and Proprietary Information</p>
+       </div>
+     </div>
+
+     {/* No data message */}
+     {filteredData.length === 0 && (
+       <div className="no-print text-center py-12">
+         <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+         <h3 className="text-lg font-medium text-gray-900 mb-2">No maintenance tasks found</h3>
+         <p className="text-gray-600">
+           {maintenanceData.length === 0 
+             ? "No maintenance data is available. Please ensure maintenance records are loaded."
+             : "Try adjusting your filters to see more results."
+           }
+         </p>
+       </div>
+     )}
+   </div>
+ );
 };
 
 export default PDFMaintenanceGenerator;

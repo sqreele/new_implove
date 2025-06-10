@@ -8,5 +8,5 @@ export default function PDFGeneratorPage() {
   const { currentFilters } = useFilters();
 
   // ✅ Correct: The 'PDFMaintenanceGenerator' component accepts the initialFilters prop.
-  return <PDFMaintenanceGenerator initialFilters={currentFilters} />;
+  return <PDFMaintenanceGenerator initialFilters={{ ...currentFilters, machineId: '' /* TODO: Provide actual machineId */ }} />;
 }
