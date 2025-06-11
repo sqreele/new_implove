@@ -288,8 +288,50 @@ export function getLocationString(item: PreventiveMaintenance): string {
 }
 
 // ✅ Machine filtering helper for consistent filtering
-export function itemMatchesMachine(item: PreventiveMaintenance, machineId: string): boolean {
-  if (!machineId || !item.machines || item.machines.length === 0) return false;
+export function itemMatchesMachine(item: PreventiveMaintenance, machineFilter: string): boolean {
+  if (!machineFilter || machineFilter === 'all') return true;
   
-  return item.machines.some(machine => machine.machine_id === machineId);
+  // Check if item has machines array
+  if (!item.machines || !Array.isArray(item.machines) || item.machines.length === 0) {
+    return false;
+  }
+  
+  // Check if any machine in the array matches the filter
+  return item.machines.some(machine => {
+    if (typeof machine === 'object' && machine !== null) {
+      // Match by machine_id or name
+      return machine.machine_id === machineFilter || 
+             machine.name === machineFilter;
+    }
+    return false;
+  });
+}
+export function getUniqueMachinesFromItems(items: PreventiveMaintenance[]): Array<{id: string, label: string}> {
+  const machineMap = new Map<string, {id: string, label: string}>();
+  
+  items.forEach(item => {
+    if (item.machines && Array.isArray(item.machines)) {
+      item.machines.forEach(machine => {
+        if (typeof machine === 'object' && machine !== null) {
+          // Add machine_id as option
+          if (machine.machine_id) {
+            machineMap.set(machine.machine_id, {
+              id: machine.machine_id,
+              label: `${machine.name} (${machine.machine_id})`
+            });
+          }
+          
+          // Also add name as separate option if different
+          if (machine.name && machine.name !== machine.machine_id) {
+            machineMap.set(machine.name, {
+              id: machine.name,
+              label: machine.name
+            });
+          }
+        }
+      });
+    }
+  });
+  
+  return Array.from(machineMap.values()).sort((a, b) => a.label.localeCompare(b.label));
 }

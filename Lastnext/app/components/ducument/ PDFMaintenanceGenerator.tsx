@@ -46,6 +46,11 @@ interface PDFMaintenanceGeneratorProps {
   initialFilters?: InitialFilters;
 }
 
+interface MachineOption {
+  id: string;
+  label: string;
+}
+
 const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({ 
   initialFilters 
 }) => {
@@ -94,14 +99,48 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     return url || undefined;
   };
 
-  // ✅ Updated client-side filtering with imported functions
+  // ✅ Updated getUniqueMachines function to provide better options
+  const getUniqueMachines = (): MachineOption[] => {
+    const machineOptions: MachineOption[] = [];
+    const seen = new Set<string>();
+    
+    maintenanceData.forEach(item => {
+      if (item.machines && Array.isArray(item.machines)) {
+        item.machines.forEach(machine => {
+          if (typeof machine === 'object' && machine !== null) {
+            // Add machine_id option with name as label
+            if (machine.machine_id && !seen.has(machine.machine_id)) {
+              seen.add(machine.machine_id);
+              machineOptions.push({
+                id: machine.machine_id,
+                label: `${machine.name} (${machine.machine_id})`
+              });
+            }
+          }
+        });
+      }
+    });
+    
+    return machineOptions.sort((a, b) => a.label.localeCompare(b.label));
+  };
+
+  // ✅ Updated client-side filtering with improved machine handling
   const filteredData = maintenanceData.filter((item: PreventiveMaintenance) => {
     const actualStatus = getTaskStatus(item);
     const statusMatch = filterStatus === 'all' || actualStatus === filterStatus;
     const frequencyMatch = filterFrequency === 'all' || item.frequency === filterFrequency;
     
-    // ✅ Use imported itemMatchesMachine function
-    const machineMatch = filterMachine === 'all' || itemMatchesMachine(item, filterMachine);
+    // ✅ Use improved itemMatchesMachine function
+    const machineMatch = itemMatchesMachine(item, filterMachine);
+    
+    // Debug logging for machine filtering
+    if (filterMachine !== 'all' && process.env.NODE_ENV === 'development') {
+      console.log(`🔍 Filtering item ${item.pm_id} with machine filter "${filterMachine}":`, {
+        matches: machineMatch,
+        item_machines: item.machines?.map(m => ({ id: m.machine_id, name: m.name })),
+        filter: filterMachine
+      });
+    }
     
     const searchMatch = !searchTerm || 
       item.pmtitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -122,18 +161,19 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     return statusMatch && frequencyMatch && machineMatch && dateMatch && completedMatch && searchMatch;
   });
 
-  // ✅ Updated getUniqueMachines function
-  const getUniqueMachines = () => {
-    const machines = new Set<string>();
-    maintenanceData.forEach(item => {
-      if (item.machines && item.machines.length > 0) {
-        item.machines.forEach(machine => {
-          const name = machine.name || machine.machine_id;
-          if (name) machines.add(name);
-        });
-      }
+  // ✅ Test machine filtering function
+  const testMachineFiltering = () => {
+    console.log('🧪 Testing machine filtering...');
+    
+    const testFilters = ['M258B868202', 'M251594E2C3', 'M25ECAF24CF', 'FCU240', 'The Elevelator  No. 1'];
+    
+    testFilters.forEach(filter => {
+      const matches = maintenanceData.filter(item => itemMatchesMachine(item, filter));
+      console.log(`Filter "${filter}": ${matches.length} matches`);
+      matches.forEach(item => {
+        console.log(`  - ${item.pm_id}: ${item.machines?.map(m => `${m.name} (${m.machine_id})`).join(', ')}`);
+      });
     });
-    return Array.from(machines).sort();
   };
 
   // Convert image URL to base64 with proper proxy handling
@@ -223,6 +263,13 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
 
     convertImages();
   }, [filteredData, includeImages]);
+
+  // Test filtering when data changes
+  useEffect(() => {
+    if (maintenanceData.length > 0 && process.env.NODE_ENV === 'development') {
+      testMachineFiltering();
+    }
+  }, [maintenanceData]);
 
   // Fetch data with initial filters when component mounts
   useEffect(() => {
@@ -630,16 +677,22 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
             </select>
           </div>
 
+          {/* ✅ Updated machine filter dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Override Machine Filter</label>
             <select
               value={filterMachine}
-              onChange={(e) => setFilterMachine(e.target.value)}
+              onChange={(e) => {
+                console.log('Machine filter changed to:', e.target.value);
+                setFilterMachine(e.target.value);
+              }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Machines</option>
               {getUniqueMachines().map(machine => (
-                <option key={machine} value={machine}>{machine}</option>
+                <option key={machine.id} value={machine.id}>
+                  {machine.label}
+                </option>
               ))}
             </select>
           </div>
@@ -715,56 +768,87 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
             {maintenanceData.length === 0 && " - No data available. Make sure maintenance records are loaded."}
             {includeImages && Object.keys(imageDataUrls).length > 0 && (
               <span className="block mt-1">
-                <strong>Images:</strong> {Object.keys(imageDataUrls).length} images converted to base64
-              </span>
-            )}
-          </p>
+            <strong>Images:</strong> {Object.keys(imageDataUrls).length} images converted to base64
+             </span>
+           )}
+         </p>
+       </div>
+
+       {/* ✅ Debug Info Section - Only show in development */}
+       {process.env.NODE_ENV === 'development' && (
+         <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+           <h4 className="font-medium text-yellow-900 mb-2">🧪 Debug Info:</h4>
+           <div className="text-sm text-yellow-800 space-y-1">
+             <div>Total items: {maintenanceData.length}</div>
+             <div>Filtered items: {filteredData.length}</div>
+             <div>Machine filter: {filterMachine}</div>
+             <div>Available machines: {getUniqueMachines().length}</div>
+             {filterMachine !== 'all' && (
+               <div className="mt-2">
+                 <div className="font-medium">Items matching machine filter "{filterMachine}":</div>
+                 {maintenanceData.filter(item => itemMatchesMachine(item, filterMachine)).map(item => (
+                   <div key={item.pm_id} className="ml-4 text-xs">
+                     {item.pm_id}: {item.machines?.map(m => `${m.name} (${m.machine_id})`).join(', ')}
+                   </div>
+                 ))}
+               </div>
+             )}
+             <details className="mt-2">
+               <summary className="cursor-pointer font-medium">Available Machine Options</summary>
+               <div className="ml-4 mt-1 text-xs">
+                 {getUniqueMachines().map(machine => (
+                   <div key={machine.id}>{machine.id} → {machine.label}</div>
+                 ))}
+               </div>
+             </details>
+           </div>
+         </div>
+       )}
+     </div>
+
+     {/* PDF Content - Fixed width and centering */}
+     <div 
+       id="pdf-content" 
+       ref={printRef} 
+       className="bg-white mx-auto"
+       style={{ 
+         width: '794px', // A4 width in pixels at 96 DPI
+         maxWidth: '100%',
+         padding: '40px',
+         fontFamily: 'Arial, sans-serif',
+         lineHeight: '1.6',
+         color: '#000000'
+       }}
+     >
+       {/* Header */}
+       <div className="text-center mb-8 border-b-2 border-gray-300 pb-6">
+         <h1 className="text-3xl font-bold text-gray-900 mb-2">Preventive Maintenance Report</h1>
+         <p className="text-gray-600">Generated on {new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}</p>
+        <div className="flex justify-center items-center mt-4 text-sm text-gray-500">
+          <Building className="h-4 w-4 mr-2" />
+          Facility Management System
         </div>
       </div>
 
-      {/* PDF Content - Fixed width and centering */}
-      <div 
-        id="pdf-content" 
-        ref={printRef} 
-        className="bg-white mx-auto"
-        style={{ 
-          width: '794px', // A4 width in pixels at 96 DPI
-          maxWidth: '100%',
-          padding: '40px',
-          fontFamily: 'Arial, sans-serif',
-          lineHeight: '1.6',
-          color: '#000000'
-        }}
-      >
-        {/* Header */}
-        <div className="text-center mb-8 border-b-2 border-gray-300 pb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Preventive Maintenance Report</h1>
-          <p className="text-gray-600">Generated on {new Date().toLocaleDateString('en-US', {
-           year: 'numeric',
-           month: 'long',
-           day: 'numeric',
-           hour: '2-digit',
-           minute: '2-digit'
-         })}</p>
-         <div className="flex justify-center items-center mt-4 text-sm text-gray-500">
-           <Building className="h-4 w-4 mr-2" />
-           Facility Management System
+      {/* Summary Statistics */}
+      <div className="mb-8 bg-gray-50 p-6 rounded-lg">
+        <h2 className="text-xl font-semibold mb-4 flex items-center">
+          <Settings className="h-5 w-5 mr-2" />
+          Summary Statistics
+        </h2>
+       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+         <div className="text-center">
+           <div className="text-2xl font-bold text-blue-600">{filteredData.length}</div>
+           <div className="text-sm text-gray-600">Total Tasks</div>
          </div>
-       </div>
-
-       {/* Summary Statistics */}
-       <div className="mb-8 bg-gray-50 p-6 rounded-lg">
-         <h2 className="text-xl font-semibold mb-4 flex items-center">
-           <Settings className="h-5 w-5 mr-2" />
-           Summary Statistics
-         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{filteredData.length}</div>
-            <div className="text-sm text-gray-600">Total Tasks</div>
-          </div>
-          <div className="text-center">
-          <div className="text-2xl font-bold text-green-600">
+         <div className="text-center">
+           <div className="text-2xl font-bold text-green-600">
              {filteredData.filter(item => getTaskStatus(item) === 'completed').length}
            </div>
            <div className="text-sm text-gray-600">Completed</div>
