@@ -267,18 +267,12 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
     if (maintenanceData.before_image_url) {
       return maintenanceData.before_image_url;
     }
-    if (maintenanceData.before_image) {
-      return getImageUrl(maintenanceData.before_image);
-    }
     return null;
   };
 
   const getAfterImageUrl = (): string | null => {
     if (maintenanceData.after_image_url) {
       return maintenanceData.after_image_url;
-    }
-    if (maintenanceData.after_image) {
-      return getImageUrl(maintenanceData.after_image);
     }
     return null;
   };
@@ -394,7 +388,8 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
       return (topics as any[]).map(topic => topic.title).join(', ');
     }
     
-    return (topics as number[]).join(', ');
+    // Handle case where topics are numbers (IDs)
+    return (topics as unknown as number[]).join(', ');
   };
 
   return (
