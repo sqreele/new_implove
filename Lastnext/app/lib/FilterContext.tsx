@@ -12,6 +12,7 @@ interface FilterState {
   endDate: string;
   page: number;
   pageSize: number;
+  machine: string; // Add machine filter
 }
 
 interface FilterContextType {
@@ -28,7 +29,8 @@ const defaultFilters: FilterState = {
   startDate: '',
   endDate: '',
   page: 1,
-  pageSize: 10
+  pageSize: 10,
+  machine: '', // Add default machine filter
 };
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);

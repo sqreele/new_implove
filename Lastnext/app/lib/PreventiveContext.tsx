@@ -1,3 +1,5 @@
+// app/lib/PreventiveContext.tsx
+
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
@@ -9,7 +11,7 @@ import preventiveMaintenanceService, {
   DashboardStats
 } from '@/app/lib/PreventiveMaintenanceService';
 import TopicService from '@/app/lib/TopicService';
-// Import Topic from the same place as TopicService to avoid type conflicts
+import MachineService, { Machine } from '@/app/lib/MachineService';
 import { Topic } from '@/app/lib/TopicService';
 
 export interface SearchParams {
@@ -22,10 +24,9 @@ export interface SearchParams {
   end_date?: string;
   property_id?: string;
   topic_id?: string;
-  machine_id?: string; // This is already present in your original code
+  machine_id?: string;
 }
 
-// Using the exact same interface from the service layer for consistency
 export type PreventiveMaintenanceRequest = CreatePreventiveMaintenanceData;
 export type PreventiveMaintenanceUpdateRequest = UpdatePreventiveMaintenanceData;
 export type PreventiveMaintenanceCompleteRequest = CompletePreventiveMaintenanceData;
@@ -33,6 +34,7 @@ export type PreventiveMaintenanceCompleteRequest = CompletePreventiveMaintenance
 interface PreventiveMaintenanceContextState {
   maintenanceItems: PreventiveMaintenance[];
   topics: Topic[];
+  machines: Machine[];
   statistics: DashboardStats | null;
   selectedMaintenance: PreventiveMaintenance | null;
   totalCount: number;
@@ -48,8 +50,10 @@ interface PreventiveMaintenanceContextState {
   deleteMaintenance: (pmId: string) => Promise<boolean>;
   completeMaintenance: (pmId: string, data: PreventiveMaintenanceCompleteRequest) => Promise<PreventiveMaintenance | null>;
   fetchTopics: () => Promise<void>;
+  fetchMachines: (propertyId?: string) => Promise<void>;
   setFilterParams: (params: SearchParams) => void;
   clearError: () => void;
+  debugMachineFilter: (machineId: string) => Promise<void>; // Added debug function
 }
 
 const PreventiveMaintenanceContext = createContext<PreventiveMaintenanceContextState | undefined>(undefined);
@@ -62,6 +66,7 @@ export const PreventiveMaintenanceProvider: React.FC<PreventiveMaintenanceProvid
   const [maintenanceItems, setMaintenanceItems] = useState<PreventiveMaintenance[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [machines, setMachines] = useState<Machine[]>([]);
   const [statistics, setStatistics] = useState<DashboardStats | null>(null);
   const [selectedMaintenance, setSelectedMaintenance] = useState<PreventiveMaintenance | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -76,6 +81,78 @@ export const PreventiveMaintenanceProvider: React.FC<PreventiveMaintenanceProvid
     setError(null);
   }, []);
 
+  // Enhanced fetchMachines function
+  const fetchMachines = useCallback(async (propertyId?: string) => {
+    try {
+      console.log('🏭 Fetching machines...');
+      const machineService = new MachineService();
+      const response = await machineService.getMachines(propertyId);
+
+      if (response.success && response.data) {
+        console.log(`✅ Loaded ${response.data.length} machines:`, response.data);
+        setMachines(response.data);
+      } else {
+        console.warn('⚠️ Failed to fetch machines:', response.message);
+        setMachines([]);
+      }
+    } catch (err: any) {
+      console.warn('⚠️ Error fetching machines (machines may not be available):', err.message);
+      setMachines([]);
+    }
+  }, []);
+
+  // Helper function to check if an item matches the machine filter
+  const itemMatchesMachine = useCallback((item: PreventiveMaintenance, machineId: string): boolean => {
+    if (!machineId) return true;
+
+    console.log(`🔍 Checking item ${item.pm_id} for machine ${machineId}`);
+
+    // Check direct machine_id property
+    if (item.machine_id === machineId) {
+      console.log(`✅ Direct match: item.machine_id (${item.machine_id}) === ${machineId}`);
+      return true;
+    }
+
+    // Check machines array/object
+    if (item.machines) {
+      if (Array.isArray(item.machines)) {
+        const arrayMatch = item.machines.some(machine => {
+          if (typeof machine === 'string') {
+            return machine === machineId;
+          }
+          if (typeof machine === 'object' && machine !== null) {
+            return (machine as any).machine_id === machineId || 
+                   String((machine as any).id) === machineId ||
+                   (machine as any).machineId === machineId;
+          }
+          return false;
+        });
+        
+        if (arrayMatch) {
+          console.log(`✅ Array match found in machines:`, item.machines);
+          return true;
+        }
+      } else if (typeof item.machines === 'object' && item.machines !== null) {
+        const machine = item.machines as any;
+        const objectMatch = machine.machine_id === machineId || 
+                          String(machine.id) === machineId ||
+                          machine.machineId === machineId;
+        
+        if (objectMatch) {
+          console.log(`✅ Object match found:`, machine);
+          return true;
+        }
+      }
+    }
+
+    console.log(`❌ No match for item ${item.pm_id}:`, {
+      machine_id: item.machine_id,
+      machines: item.machines
+    });
+    return false;
+  }, []);
+
+  // Enhanced fetchMaintenanceItems with better machine filtering
   const fetchMaintenanceItems = useCallback(
     async (params?: SearchParams) => {
       setIsLoading(true);
@@ -85,6 +162,9 @@ export const PreventiveMaintenanceProvider: React.FC<PreventiveMaintenanceProvid
         const fetchParams = { ...filterParams, ...params };
         const queryParams: Record<string, string | number> = {};
 
+        console.log('🔄 Fetching maintenance items with params:', fetchParams);
+
+        // Add all filter parameters
         if (fetchParams.status) queryParams.status = fetchParams.status;
         if (fetchParams.frequency) queryParams.frequency = fetchParams.frequency;
         if (fetchParams.page) queryParams.page = fetchParams.page;
@@ -94,58 +174,130 @@ export const PreventiveMaintenanceProvider: React.FC<PreventiveMaintenanceProvid
         if (fetchParams.end_date) queryParams.date_to = fetchParams.end_date;
         if (fetchParams.property_id) queryParams.property_id = fetchParams.property_id;
         if (fetchParams.topic_id) queryParams.topic_id = fetchParams.topic_id;
-        if (fetchParams.machine_id) queryParams.machine_id = fetchParams.machine_id;
 
-        console.log('Fetching maintenance items with params:', queryParams);
-        const response = await preventiveMaintenanceService.getAllPreventiveMaintenance(queryParams);
+        let finalItems: PreventiveMaintenance[] = [];
+        let finalCount = 0;
 
-        if (response.success && response.data) {
-          let items: PreventiveMaintenance[] = [];
-          let count: number = 0;
-
-          // Use type assertion to tell TypeScript about the possible types
-          type ResponseDataType = PreventiveMaintenance[] | { 
-            results: PreventiveMaintenance[]; 
-            count: number;
-          };
+        // Handle machine filtering with enhanced logic
+        if (fetchParams.machine_id) {
+          console.log(`🎯 Machine filter requested: ${fetchParams.machine_id}`);
           
-          const responseData = response.data as ResponseDataType;
+          // Try using the enhanced machine filtering service method
+          try {
+            const machineResponse = await preventiveMaintenanceService.getPreventiveMaintenanceByMachine(
+              fetchParams.machine_id,
+              queryParams
+            );
 
-          if (Array.isArray(responseData)) {
-            items = responseData;
-            count = responseData.length;
-          } else {
-            // Now TypeScript knows this must be the object type with results and count
-            items = responseData.results;
-            count = responseData.count;
+            if (machineResponse.success && machineResponse.data) {
+              if (Array.isArray(machineResponse.data)) {
+                finalItems = machineResponse.data;
+                finalCount = finalItems.length;
+              } else if (machineResponse.data && 'results' in machineResponse.data) {
+                finalItems = (machineResponse.data as any).results;
+                finalCount = (machineResponse.data as any).count || finalItems.length;
+              }
+
+              console.log(`✅ Machine filtering successful: ${finalItems.length} items found`);
+            } else {
+              console.log('⚠️ Machine filtering returned no data, trying fallback');
+              throw new Error('Machine filtering failed');
+            }
+          } catch (machineError) {
+            console.log('⚠️ Machine filtering failed, falling back to client-side filtering');
+            
+            // Fallback: Get all items and filter client-side
+            const allResponse = await preventiveMaintenanceService.getAllPreventiveMaintenance(queryParams);
+            
+            if (allResponse.success && allResponse.data) {
+              let allItems: PreventiveMaintenance[] = [];
+              
+              if (Array.isArray(allResponse.data)) {
+                allItems = allResponse.data;
+              } else if (allResponse.data && 'results' in allResponse.data) {
+                allItems = (allResponse.data as any).results;
+              }
+
+              finalItems = allItems.filter(item => itemMatchesMachine(item, fetchParams.machine_id!));
+              finalCount = finalItems.length;
+              
+              console.log(`🔧 Client-side filtering: ${allItems.length} -> ${finalItems.length} items`);
+            }
           }
-
-          setMaintenanceItems(items);
-          setTotalCount(count);
         } else {
-          throw new Error(response.message || 'Failed to fetch maintenance items');
+          // No machine filter, use standard fetching
+          if (fetchParams.machine_id) queryParams.machine_id = fetchParams.machine_id;
+          
+          const response = await preventiveMaintenanceService.getAllPreventiveMaintenance(queryParams);
+
+          if (response.success && response.data) {
+            if (Array.isArray(response.data)) {
+              finalItems = response.data;
+              finalCount = finalItems.length;
+            } else if (response.data && 'results' in response.data) {
+              finalItems = (response.data as any).results;
+              finalCount = (response.data as any).count || finalItems.length;
+            }
+          } else {
+            throw new Error(response.message || 'Failed to fetch maintenance items');
+          }
         }
+
+        setMaintenanceItems(finalItems);
+        setTotalCount(finalCount);
+        
+        console.log(`📊 Final result: ${finalItems.length} items loaded`);
+        
       } catch (err: any) {
-        console.error('Error fetching maintenance items:', err);
+        console.error('❌ Error fetching maintenance items:', err);
         setError(err.message || 'Failed to fetch maintenance items');
+        setMaintenanceItems([]);
+        setTotalCount(0);
       } finally {
         setIsLoading(false);
       }
     },
-    [filterParams, clearError]
+    [filterParams, clearError, itemMatchesMachine]
   );
 
+  // Enhanced fetchMaintenanceByMachine function
   const fetchMaintenanceByMachine = useCallback(
     async (machineId: string) => {
       if (!machineId) {
         setError('Machine ID is required');
         return;
       }
+      
+      console.log(`🎯 Fetching maintenance specifically for machine: ${machineId}`);
       await fetchMaintenanceItems({ machine_id: machineId });
     },
     [fetchMaintenanceItems]
   );
 
+  // Debug function for machine filtering
+  const debugMachineFilter = useCallback(async (machineId: string) => {
+    console.log(`🧪 === DEBUGGING MACHINE FILTER FOR: ${machineId} ===`);
+    
+    try {
+      // Debug using the service method
+      await preventiveMaintenanceService.debugMachineFiltering(machineId);
+      
+      // Also test current context state
+      console.log('📊 Current context state:');
+      console.log('- Available machines:', machines.length);
+      console.log('- Current maintenance items:', maintenanceItems.length);
+      console.log('- Filter params:', filterParams);
+      
+      // Test client-side filtering on current items
+      const matching = maintenanceItems.filter(item => itemMatchesMachine(item, machineId));
+      console.log(`🎯 Client-side filtering result: ${matching.length}/${maintenanceItems.length} items match`);
+      
+    } catch (error) {
+      console.error('🧪 Debug failed:', error);
+    }
+  }, [machines, maintenanceItems, filterParams, itemMatchesMachine]);
+
+  // Keep all existing functions
   const fetchStatistics = useCallback(async () => {
     setIsLoading(true);
     clearError();
@@ -175,7 +327,6 @@ export const PreventiveMaintenanceProvider: React.FC<PreventiveMaintenanceProvid
       const response = await topicService.getTopics();
 
       if (response.success && response.data) {
-        // Explicitly convert the returned data to be compatible with the state type
         setTopics(response.data as Topic[]);
       } else {
         throw new Error(response.message || 'Failed to fetch topics');
@@ -332,15 +483,39 @@ export const PreventiveMaintenanceProvider: React.FC<PreventiveMaintenanceProvid
     [fetchMaintenanceItems, clearError]
   );
 
+  // Enhanced useEffect with better debugging
   useEffect(() => {
-    fetchTopics();
-    fetchStatistics();
-    fetchMaintenanceItems();
-  }, [fetchTopics, fetchStatistics, fetchMaintenanceItems]);
+    console.log('🚀 Initializing PreventiveMaintenanceProvider');
+    
+    const initializeData = async () => {
+      await Promise.all([
+        fetchTopics(),
+        fetchStatistics(),
+        fetchMachines()
+      ]);
+      
+      // Fetch maintenance items last
+      await fetchMaintenanceItems();
+    };
+
+    initializeData();
+  }, [fetchTopics, fetchStatistics, fetchMachines, fetchMaintenanceItems]);
+
+  // Debug effect to monitor filter changes
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Filter params changed:', filterParams);
+      if (filterParams.machine_id) {
+        const selectedMachine = machines.find(m => m.machine_id === filterParams.machine_id);
+        console.log('📍 Selected machine:', selectedMachine);
+      }
+    }
+  }, [filterParams, machines]);
 
   const contextValue: PreventiveMaintenanceContextState = {
     maintenanceItems,
     topics,
+    machines,
     statistics,
     selectedMaintenance,
     totalCount,
@@ -356,8 +531,10 @@ export const PreventiveMaintenanceProvider: React.FC<PreventiveMaintenanceProvid
     deleteMaintenance,
     completeMaintenance,
     fetchTopics,
+    fetchMachines,
     setFilterParams,
     clearError,
+    debugMachineFilter, // Added debug function to context
   };
 
   return (
