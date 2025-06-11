@@ -423,9 +423,9 @@ export default function PreventiveMaintenanceDashboard() {
                   // Get maintenance title
                   const title = getMaintenanceTitle(item);
                   
-                  // Get image URLs
-                  const beforeImageUrl = item.before_image_url || (item.before_image ? getImageUrl(item.before_image) : null);
-                  const afterImageUrl = item.after_image_url || (item.after_image ? getImageUrl(item.after_image) : null);
+                  // Get image URLs - only use URL properties since before_image/after_image don't exist on type
+                  const beforeImageUrl = item.before_image_url || null;
+                  const afterImageUrl = item.after_image_url || null;
                   
                   return (
                     <tr key={item.pm_id} className="hover:bg-gray-50">

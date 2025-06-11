@@ -602,9 +602,9 @@ export default function CompletePreventiveMaintenance({ params }: CompletePreven
                         alt="Before maintenance" 
                         className="h-full w-full object-cover"
                       />
-                    ) : selectedMaintenance.before_image ? (
+                    ) : selectedMaintenance.before_image_url ? (
                       <img 
-                        src={getImageUrl(selectedMaintenance.before_image) || ''}
+                        src={selectedMaintenance.before_image_url}
                         alt="Before maintenance" 
                         className="h-full w-full object-cover"
                       />
