@@ -13,16 +13,18 @@ import {
   PreventiveMaintenance, 
   MachineDetails,
   Topic,
-  determinePMStatus 
+  determinePMStatus,
+  getMachinesString,    // ✅ Import from models
+  getLocationString     // ✅ Import from models
 } from '@/app/lib/preventiveMaintenanceModels';
 
-// ✅ แก้ไข interface สำหรับ images
+// ✅ Fixed interface for images
 interface MaintenanceImage {
   id: string;
   url: string;
   type: 'before' | 'after';
   caption?: string;
-  timestamp?: string | null; // เพิ่ม null support
+  timestamp?: string | null;
 }
 
 // Extended PreventiveMaintenance interface for images
@@ -30,16 +32,15 @@ interface PreventiveMaintenanceWithImages extends PreventiveMaintenance {
   images?: MaintenanceImage[];
   before_images?: MaintenanceImage[];
   after_images?: MaintenanceImage[];
-  // เพิ่ม legacy fields สำหรับ backward compatibility
+  // Legacy fields for backward compatibility
   before_image?: string;
   after_image?: string;
   before_image_url?: string;
   after_image_url?: string;
 }
 
-// ... styles object ตามเดิม ...
+// PDF Styles
 const styles = StyleSheet.create({
-  // ใส่ styles เดิมทั้งหมดตามที่ให้ไปแล้ว
   page: {
     flexDirection: 'column',
     backgroundColor: '#FFFFFF',
@@ -455,37 +456,6 @@ const getTopicsString = (topics: Topic[] | number[] | null | undefined) => {
   return (topics as number[]).join(', ');
 };
 
-const getMachinesString = (machines: Array<MachineDetails | string> | null | undefined) => {
-  if (!machines || machines.length === 0) return 'No machines assigned';
-  
-  return machines.map(machine => {
-    if (typeof machine === 'string') {
-      return machine;
-    }
-    
-    const machineWithLocation = machine as any;
-    const name = machine.name || machine.machine_id;
-    const location = machineWithLocation.location ? ` (${machineWithLocation.location})` : '';
-    
-    return `${name}${location}`;
-  }).join(', ');
-};
-
-const getLocationString = (item: PreventiveMaintenance) => {
-  if (item.machines && item.machines.length > 0) {
-    const firstMachine = item.machines[0];
-    
-    if (typeof firstMachine === 'string') {
-      return firstMachine;
-    }
-    
-    const machineWithLocation = firstMachine as any;
-    return machineWithLocation.location || firstMachine.machine_id || 'Unknown';
-  }
-  
-  return item.property_id || 'Unknown';
-};
-
 const getStatusStyle = (status: string) => {
   switch (status) {
     case 'completed':
@@ -499,7 +469,7 @@ const getStatusStyle = (status: string) => {
   }
 };
 
-// ✅ แก้ไข Image helper functions เพื่อ handle null
+// ✅ Image helper functions with proper null handling
 const getBeforeImages = (item: PreventiveMaintenanceWithImages): MaintenanceImage[] => {
   const beforeImages: MaintenanceImage[] = [];
   
@@ -523,7 +493,7 @@ const getBeforeImages = (item: PreventiveMaintenanceWithImages): MaintenanceImag
         url: legacyUrl,
         type: 'before',
         caption: 'Before maintenance',
-        timestamp: item.scheduled_date || undefined // ✅ แก้ไขตรงนี้
+        timestamp: item.scheduled_date || null
       });
     }
   }
@@ -554,7 +524,7 @@ const getAfterImages = (item: PreventiveMaintenanceWithImages): MaintenanceImage
         url: legacyUrl,
         type: 'after',
         caption: 'After maintenance',
-        timestamp: item.completed_date || undefined // ✅ แก้ไขตรงนี้
+        timestamp: item.completed_date || null
       });
     }
   }
@@ -591,7 +561,7 @@ const ImageDisplay: React.FC<{
     return (
       <View style={[style, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#fef2f2' }]}>
         <Text style={styles.imageErrorText}>
-          ไม่สามารถโหลดรูปภาพได้
+          Unable to load image
         </Text>
       </View>
     );
@@ -606,7 +576,7 @@ const MultipleImagesDisplay: React.FC<{
     return (
       <View>
         <Text style={styles.imageGroupTitle}>{title}</Text>
-        <Text style={styles.noImagesText}>ไม่มีรูปภาพ</Text>
+        <Text style={styles.noImagesText}>No images</Text>
       </View>
     );
   }
@@ -616,7 +586,7 @@ const MultipleImagesDisplay: React.FC<{
       <Text style={styles.imageGroupTitle}>{title}</Text>
       {images.length > 1 && (
         <Text style={styles.imageCountBadge}>
-          {images.length} รูปภาพ
+          {images.length} images
         </Text>
       )}
       
@@ -659,7 +629,7 @@ const MultipleImagesDisplay: React.FC<{
           </View>
           {images.length > 4 && (
             <Text style={styles.imageCaption}>
-              + อีก {images.length - 4} รูปภาพ
+              + {images.length - 4} more images
             </Text>
           )}
         </View>
@@ -675,334 +645,334 @@ const BeforeAfterImages: React.FC<{ item: PreventiveMaintenanceWithImages }> = (
   if (beforeImages.length === 0 && afterImages.length === 0) {
     return (
       <View style={styles.imageSection}>
-        <Text style={styles.imageSectionTitle}>🖼️ รูปภาพก่อน-หลังการบำรุงรักษา</Text>
-        <Text style={styles.noImagesText}>ไม่มีรูปภาพก่อน-หลังสำหรับงานนี้</Text>
+        <Text style={styles.imageSectionTitle}>🖼️ Before/After Maintenance Images</Text>
+        <Text style={styles.noImagesText}>No before/after images for this task</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.imageSection}>
-      <Text style={styles.imageSectionTitle}>🖼️ รูปภาพก่อน-หลังการบำรุงรักษา</Text>
+      <Text style={styles.imageSectionTitle}>🖼️ Before/After Maintenance Images</Text>
       <View style={styles.imageContainer}>
-        <View style={styles.imageGroup}>
-          <MultipleImagesDisplay 
-            images={beforeImages} 
-            title="🔴 ก่อนการบำรุงรักษา" 
-          />
-        </View>
-        <View style={styles.imageGroup}>
-          <MultipleImagesDisplay 
-            images={afterImages} 
-            title="🟢 หลังการบำรุงรักษา" 
-          />
-        </View>
-      </View>
-    </View>
-  );
+       <View style={styles.imageGroup}>
+         <MultipleImagesDisplay 
+           images={beforeImages} 
+           title="🔴 Before Maintenance" 
+         />
+       </View>
+       <View style={styles.imageGroup}>
+         <MultipleImagesDisplay 
+           images={afterImages} 
+           title="🟢 After Maintenance" 
+         />
+       </View>
+     </View>
+   </View>
+ );
 };
 
 const ImageSummaryDisplay: React.FC<{ item: PreventiveMaintenanceWithImages }> = ({ item }) => {
-  const beforeImages = getBeforeImages(item);
-  const afterImages = getAfterImages(item);
-  
-  if (beforeImages.length === 0 && afterImages.length === 0) {
-    return <Text style={styles.tableCellText}>ไม่มีรูปภาพ</Text>;
-  }
-  
-  return (
-    <Text style={styles.tableCellText}>
-      {beforeImages.length > 0 && `${beforeImages.length}B`}
-      {beforeImages.length > 0 && afterImages.length > 0 && '/'}
-      {afterImages.length > 0 && `${afterImages.length}A`}
-    </Text>
-  );
+ const beforeImages = getBeforeImages(item);
+ const afterImages = getAfterImages(item);
+ 
+ if (beforeImages.length === 0 && afterImages.length === 0) {
+   return <Text style={styles.tableCellText}>No images</Text>;
+ }
+ 
+ return (
+   <Text style={styles.tableCellText}>
+     {beforeImages.length > 0 && `${beforeImages.length}B`}
+     {beforeImages.length > 0 && afterImages.length > 0 && '/'}
+     {afterImages.length > 0 && `${afterImages.length}A`}
+   </Text>
+ );
 };
 
 const MaintenancePDFDocument: React.FC<MaintenancePDFDocumentProps> = ({
-  data,
-  appliedFilters,
-  includeDetails = true,
-  includeImages = false,
-  title = 'รายงานการบำรุงรักษาเชิงป้องกัน'
+ data,
+ appliedFilters,
+ includeDetails = true,
+ includeImages = false,
+ title = 'Preventive Maintenance Report'
 }) => {
-  // Calculate statistics
-  const totalTasks = data.length;
-  const completedTasks = data.filter(item => getTaskStatus(item) === 'completed').length;
-  const pendingTasks = data.filter(item => getTaskStatus(item) === 'pending').length;
-  const overdueTasks = data.filter(item => getTaskStatus(item) === 'overdue').length;
-  const tasksWithImages = includeImages ? data.filter(item => hasImages(item)).length : 0;
+ // Calculate statistics
+ const totalTasks = data.length;
+ const completedTasks = data.filter(item => getTaskStatus(item) === 'completed').length;
+ const pendingTasks = data.filter(item => getTaskStatus(item) === 'pending').length;
+ const overdueTasks = data.filter(item => getTaskStatus(item) === 'overdue').length;
+ const tasksWithImages = includeImages ? data.filter(item => hasImages(item)).length : 0;
 
-  // Check if filters are applied
-  const hasFilters = appliedFilters && Object.values(appliedFilters).some(filter => filter !== '');
+ // Check if filters are applied
+ const hasFilters = appliedFilters && Object.values(appliedFilters).some(filter => filter !== '');
 
-  return (
-    <Document>
-      <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>
-            สร้างเมื่อ {new Date().toLocaleDateString('th-TH', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </Text>
-          <Text style={styles.companyInfo}>ระบบจัดการสิ่งอำนวยความสะดวก</Text>
-        </View>
+ return (
+   <Document>
+     <Page size="A4" style={styles.page}>
+       {/* Header */}
+       <View style={styles.header}>
+         <Text style={styles.title}>{title}</Text>
+         <Text style={styles.subtitle}>
+           Generated on {new Date().toLocaleDateString('en-US', {
+             year: 'numeric',
+             month: 'long',
+             day: 'numeric',
+             hour: '2-digit',
+             minute: '2-digit'
+           })}
+         </Text>
+         <Text style={styles.companyInfo}>Facility Management System</Text>
+       </View>
 
-        {/* Applied Filters */}
-        {hasFilters && (
-          <View style={styles.filterInfo}>
-            <Text style={styles.filterTitle}>ตัวกรองที่ใช้:</Text>
-            {appliedFilters!.status && (
-              <Text style={styles.filterItem}>สถานะ: {appliedFilters!.status}</Text>
-            )}
-            {appliedFilters!.frequency && (
-              <Text style={styles.filterItem}>ความถี่: {appliedFilters!.frequency}</Text>
-            )}
-            {appliedFilters!.search && (
-              <Text style={styles.filterItem}>ค้นหา: "{appliedFilters!.search}"</Text>
-            )}
-            {appliedFilters!.startDate && (
-              <Text style={styles.filterItem}>วันเริ่มต้น: {appliedFilters!.startDate}</Text>
-            )}
-            {appliedFilters!.endDate && (
-              <Text style={styles.filterItem}>วันสิ้นสุด: {appliedFilters!.endDate}</Text>
-            )}
-          </View>
-        )}
+       {/* Applied Filters */}
+       {hasFilters && (
+         <View style={styles.filterInfo}>
+           <Text style={styles.filterTitle}>Applied Filters:</Text>
+           {appliedFilters!.status && (
+             <Text style={styles.filterItem}>Status: {appliedFilters!.status}</Text>
+           )}
+           {appliedFilters!.frequency && (
+             <Text style={styles.filterItem}>Frequency: {appliedFilters!.frequency}</Text>
+           )}
+           {appliedFilters!.search && (
+             <Text style={styles.filterItem}>Search: "{appliedFilters!.search}"</Text>
+           )}
+           {appliedFilters!.startDate && (
+             <Text style={styles.filterItem}>Start Date: {appliedFilters!.startDate}</Text>
+           )}
+           {appliedFilters!.endDate && (
+             <Text style={styles.filterItem}>End Date: {appliedFilters!.endDate}</Text>
+           )}
+         </View>
+       )}
 
-        {/* Summary Statistics */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>สรุปสถิติ</Text>
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryNumber, { color: '#2563eb' }]}>{totalTasks}</Text>
-              <Text style={styles.summaryLabel}>งานทั้งหมด</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryNumber, { color: '#16a34a' }]}>{completedTasks}</Text>
-              <Text style={styles.summaryLabel}>เสร็จสิ้น</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryNumber, { color: '#ca8a04' }]}>{pendingTasks}</Text>
-              <Text style={styles.summaryLabel}>รอดำเนินการ</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryNumber, { color: '#dc2626' }]}>{overdueTasks}</Text>
-              <Text style={styles.summaryLabel}>เลยกำหนด</Text>
-            </View>
-            {includeImages && (
-              <View style={styles.summaryItem}>
-                <Text style={[styles.summaryNumber, { color: '#7c3aed' }]}>{tasksWithImages}</Text>
-                <Text style={styles.summaryLabel}>มีรูปภาพ</Text>
-              </View>
-            )}
-          </View>
-        </View>
+       {/* Summary Statistics */}
+       <View style={styles.section}>
+         <Text style={styles.sectionTitle}>Summary Statistics</Text>
+         <View style={styles.summaryContainer}>
+           <View style={styles.summaryItem}>
+             <Text style={[styles.summaryNumber, { color: '#2563eb' }]}>{totalTasks}</Text>
+             <Text style={styles.summaryLabel}>Total Tasks</Text>
+           </View>
+           <View style={styles.summaryItem}>
+             <Text style={[styles.summaryNumber, { color: '#16a34a' }]}>{completedTasks}</Text>
+             <Text style={styles.summaryLabel}>Completed</Text>
+           </View>
+           <View style={styles.summaryItem}>
+             <Text style={[styles.summaryNumber, { color: '#ca8a04' }]}>{pendingTasks}</Text>
+             <Text style={styles.summaryLabel}>Pending</Text>
+           </View>
+           <View style={styles.summaryItem}>
+             <Text style={[styles.summaryNumber, { color: '#dc2626' }]}>{overdueTasks}</Text>
+             <Text style={styles.summaryLabel}>Overdue</Text>
+           </View>
+           {includeImages && (
+             <View style={styles.summaryItem}>
+               <Text style={[styles.summaryNumber, { color: '#7c3aed' }]}>{tasksWithImages}</Text>
+               <Text style={styles.summaryLabel}>With Images</Text>
+             </View>
+           )}
+         </View>
+       </View>
 
-        {/* Maintenance Tasks Table */}
-        {data.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>รายการงานบำรุงรักษา</Text>
-            <View style={styles.table}>
-              {/* Table Header */}
-              <View style={[styles.tableRow, styles.tableHeader]}>
-                <View style={styles.tableColHeader}>
-                  <Text style={styles.tableCellText}>รหัสงาน</Text>
-                </View>
-                <View style={styles.tableColHeader}>
-                  <Text style={styles.tableCellText}>หัวข้อ</Text>
-                </View>
-                <View style={styles.tableColHeader}>
-                  <Text style={styles.tableCellText}>กำหนดการ</Text>
-                </View>
-                <View style={styles.tableColHeader}>
-                  <Text style={styles.tableCellText}>สถานะ</Text>
-                </View>
-                <View style={styles.tableColHeader}>
-                  <Text style={styles.tableCellText}>ความถี่</Text>
-                </View>
-                <View style={styles.tableColHeader}>
-                  <Text style={styles.tableCellText}>หัวข้อ</Text>
-                </View>
-                <View style={styles.tableColHeader}>
-                  <Text style={styles.tableCellText}>
-                    {includeImages ? 'รูปภาพ' : 'สถานที่'}
-                  </Text>
-                </View>
-              </View>
+       {/* Maintenance Tasks Table */}
+       {data.length > 0 && (
+         <View style={styles.section}>
+           <Text style={styles.sectionTitle}>Maintenance Tasks</Text>
+           <View style={styles.table}>
+             {/* Table Header */}
+             <View style={[styles.tableRow, styles.tableHeader]}>
+               <View style={styles.tableColHeader}>
+                 <Text style={styles.tableCellText}>Task ID</Text>
+               </View>
+               <View style={styles.tableColHeader}>
+                 <Text style={styles.tableCellText}>Title</Text>
+               </View>
+               <View style={styles.tableColHeader}>
+                 <Text style={styles.tableCellText}>Date</Text>
+               </View>
+               <View style={styles.tableColHeader}>
+                 <Text style={styles.tableCellText}>Status</Text>
+               </View>
+               <View style={styles.tableColHeader}>
+                 <Text style={styles.tableCellText}>Frequency</Text>
+               </View>
+               <View style={styles.tableColHeader}>
+                 <Text style={styles.tableCellText}>Topics</Text>
+               </View>
+               <View style={styles.tableColHeader}>
+                 <Text style={styles.tableCellText}>
+                   {includeImages ? 'Images' : 'Location'}
+                 </Text>
+               </View>
+             </View>
 
-              {/* Table Rows */}
-              {data.map((item, index) => (
-                <View style={styles.tableRow} key={item.id || index}>
-                  <View style={styles.tableCol}>
-                    <Text style={styles.tableCellText}>{item.pm_id}</Text>
-                  </View>
-                  <View style={styles.tableCol}>
-                    <Text style={styles.tableCellText}>
-                      {item.pmtitle || 'ไม่มีหัวข้อ'}
-                    </Text>
-                  </View>
-                  <View style={styles.tableCol}>
-                    <Text style={styles.tableCellText}>
-                      {formatDate(item.scheduled_date)}
-                    </Text>
-                  </View>
-                  <View style={styles.tableCol}>
-                    <Text style={[styles.tableCellText, styles.capitalizeText]}>
-                      {getTaskStatus(item)}
-                    </Text>
-                  </View>
-                  <View style={styles.tableCol}>
-                    <Text style={[styles.tableCellText, styles.capitalizeText]}>
-                      {item.frequency}
-                    </Text>
-                  </View>
-                  <View style={styles.tableCol}>
-                    <Text style={styles.tableCellText}>
-                      {getTopicsString(item.topics)}
-                    </Text>
-                  </View>
-                  <View style={styles.tableCol}>
-                    {includeImages ? (
-                      <ImageSummaryDisplay item={item} />
-                    ) : (
-                      <Text style={styles.tableCellText}>
-                        {getLocationString(item)}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
+             {/* Table Rows */}
+             {data.map((item, index) => (
+               <View style={styles.tableRow} key={item.id || index}>
+                 <View style={styles.tableCol}>
+                   <Text style={styles.tableCellText}>{item.pm_id}</Text>
+                 </View>
+                 <View style={styles.tableCol}>
+                   <Text style={styles.tableCellText}>
+                     {item.pmtitle || 'No title'}
+                   </Text>
+                 </View>
+                 <View style={styles.tableCol}>
+                   <Text style={styles.tableCellText}>
+                     {formatDate(item.scheduled_date)}
+                   </Text>
+                 </View>
+                 <View style={styles.tableCol}>
+                   <Text style={[styles.tableCellText, styles.capitalizeText]}>
+                     {getTaskStatus(item)}
+                   </Text>
+                 </View>
+                 <View style={styles.tableCol}>
+                   <Text style={[styles.tableCellText, styles.capitalizeText]}>
+                     {item.frequency}
+                   </Text>
+                 </View>
+                 <View style={styles.tableCol}>
+                   <Text style={styles.tableCellText}>
+                     {getTopicsString(item.topics)}
+                   </Text>
+                 </View>
+                 <View style={styles.tableCol}>
+                   {includeImages ? (
+                     <ImageSummaryDisplay item={item} />
+                   ) : (
+                     <Text style={styles.tableCellText}>
+                       {getLocationString(item)}
+                     </Text>
+                   )}
+                 </View>
+               </View>
+             ))}
+           </View>
+         </View>
+       )}
 
-        {/* Page Number */}
-        <Text 
-          style={styles.pageNumber} 
-          render={({ pageNumber, totalPages }) => `หน้า ${pageNumber} จาก ${totalPages}`} 
-          fixed 
-        />
+       {/* Page Number */}
+       <Text 
+         style={styles.pageNumber} 
+         render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} 
+         fixed 
+       />
 
-        {/* Footer */}
-        <View style={styles.footer} fixed>
-          <Text>รายงานนี้สร้างโดยอัตโนมัติจากระบบจัดการสิ่งอำนวยความสะดวก</Text>
-          <Text>© 2025 - ข้อมูลลับและเป็นกรรมสิทธิ์ของบริษัท</Text>
-        </View>
-      </Page>
+       {/* Footer */}
+       <View style={styles.footer} fixed>
+         <Text>This report was automatically generated by the Facility Management System</Text>
+         <Text>© 2025 - Confidential and Proprietary Information</Text>
+       </View>
+     </Page>
 
-      {/* Detailed Task Descriptions - New Page */}
-      {includeDetails && data.length > 0 && (
-        <Page size="A4" style={styles.page}>
-          <View style={styles.header}>
-            <Text style={styles.title}>รายละเอียดงานบำรุงรักษา</Text>
-          </View>
+     {/* Detailed Task Descriptions - New Page */}
+     {includeDetails && data.length > 0 && (
+       <Page size="A4" style={styles.page}>
+         <View style={styles.header}>
+           <Text style={styles.title}>Detailed Task Information</Text>
+         </View>
 
-          {data.map((item, index) => {
-            const status = getTaskStatus(item);
-            return (
-              <View style={styles.detailCard} key={item.id || index}>
-                <View style={styles.detailHeader}>
-                  <View>
-                    <Text style={styles.detailTitle}>
-                      {item.pmtitle || 'ไม่มีหัวข้อ'}
-                    </Text>
-                    <Text style={styles.detailId}>รหัส: {item.pm_id}</Text>
-                  </View>
-                  <View style={getStatusStyle(status)}>
-                    <Text style={styles.uppercaseText}>{status}</Text>
-                  </View>
-                </View>
+         {data.map((item, index) => {
+           const status = getTaskStatus(item);
+           return (
+             <View style={styles.detailCard} key={item.id || index}>
+               <View style={styles.detailHeader}>
+                 <View>
+                   <Text style={styles.detailTitle}>
+                     {item.pmtitle || 'No title'}
+                   </Text>
+                   <Text style={styles.detailId}>ID: {item.pm_id}</Text>
+                 </View>
+                 <View style={getStatusStyle(status)}>
+                   <Text style={styles.uppercaseText}>{status}</Text>
+                 </View>
+               </View>
 
-                <View style={styles.detailGrid}>
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>วันที่กำหนด:</Text>
-                    <Text style={styles.detailValue}>{formatDate(item.scheduled_date)}</Text>
-                  </View>
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>ความถี่:</Text>
-                    <Text style={[styles.detailValue, styles.capitalizeText]}>
-                      {item.frequency}
-                    </Text>
-                  </View>
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>หัวข้อ:</Text>
-                    <Text style={styles.detailValue}>{getTopicsString(item.topics)}</Text>
-                  </View>
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>กำหนดการถัดไป:</Text>
-                    <Text style={styles.detailValue}>
-                      {item.next_due_date ? formatDate(item.next_due_date) : 'ไม่ระบุ'}
-                    </Text>
-                  </View>
-                </View>
+               <View style={styles.detailGrid}>
+                 <View style={styles.detailItem}>
+                   <Text style={styles.detailLabel}>Scheduled Date:</Text>
+                   <Text style={styles.detailValue}>{formatDate(item.scheduled_date)}</Text>
+                 </View>
+                 <View style={styles.detailItem}>
+                   <Text style={styles.detailLabel}>Frequency:</Text>
+                   <Text style={[styles.detailValue, styles.capitalizeText]}>
+                     {item.frequency}
+                   </Text>
+                 </View>
+                 <View style={styles.detailItem}>
+                   <Text style={styles.detailLabel}>Topics:</Text>
+                   <Text style={styles.detailValue}>{getTopicsString(item.topics)}</Text>
+                 </View>
+                 <View style={styles.detailItem}>
+                   <Text style={styles.detailLabel}>Next Due:</Text>
+                   <Text style={styles.detailValue}>
+                     {item.next_due_date ? formatDate(item.next_due_date) : 'Not specified'}
+                   </Text>
+                 </View>
+               </View>
 
-                {item.machines && item.machines.length > 0 && (
-                  <View style={{ marginBottom: 5 }}>
-                    <Text style={styles.detailLabel}>เครื่องจักร:</Text>
-                    <Text style={styles.detailValue}>{getMachinesString(item.machines)}</Text>
-                  </View>
-                )}
+               {item.machines && item.machines.length > 0 && (
+                 <View style={{ marginBottom: 5 }}>
+                   <Text style={styles.detailLabel}>Machines:</Text>
+                   <Text style={styles.detailValue}>{getMachinesString(item.machines)}</Text>
+                 </View>
+               )}
 
-                {item.property_id && (
-                  <View style={{ marginBottom: 5 }}>
-                    <Text style={styles.detailLabel}>รหัสทรัพย์สิน:</Text>
-                    <Text style={styles.detailValue}>{item.property_id}</Text>
-                  </View>
-                )}
+               {item.property_id && (
+                 <View style={{ marginBottom: 5 }}>
+                   <Text style={styles.detailLabel}>Property ID:</Text>
+                   <Text style={styles.detailValue}>{item.property_id}</Text>
+                 </View>
+               )}
 
-                {(item as any).job_description && (
-                  <View style={{ marginTop: 5 }}>
-                    <Text style={styles.detailLabel}>รายละเอียดงาน:</Text>
-                    <Text style={styles.description}>{(item as any).job_description}</Text>
-                  </View>
-                )}
+               {(item as any).job_description && (
+                 <View style={{ marginTop: 5 }}>
+                   <Text style={styles.detailLabel}>Job Description:</Text>
+                   <Text style={styles.description}>{(item as any).job_description}</Text>
+                 </View>
+               )}
 
-                {item.notes && (
-                  <View style={{ marginTop: 5 }}>
-                    <Text style={styles.detailLabel}>หมายเหตุ:</Text>
-                    <Text style={styles.description}>{item.notes}</Text>
-                  </View>
-                )}
+               {item.notes && (
+                 <View style={{ marginTop: 5 }}>
+                   <Text style={styles.detailLabel}>Notes:</Text>
+                   <Text style={styles.description}>{item.notes}</Text>
+                 </View>
+               )}
 
-                {/* 🖼️ Before/After Images Section */}
-                {includeImages && hasImages(item) && (
-                  <BeforeAfterImages item={item} />
-                )}
+               {/* Before/After Images Section */}
+               {includeImages && hasImages(item) && (
+                 <BeforeAfterImages item={item} />
+               )}
 
-                {item.completed_date && (
-                  <View style={{ marginTop: 8, paddingTop: 5, borderTopWidth: 1, borderTopColor: '#e5e7eb', borderTopStyle: 'solid' }}>
-                    <Text style={[styles.detailValue, { color: '#16a34a', fontWeight: 'bold' }]}>
-                      เสร็จสิ้นเมื่อ: {formatDate(item.completed_date)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            );
-          })}
+               {item.completed_date && (
+                 <View style={{ marginTop: 8, paddingTop: 5, borderTopWidth: 1, borderTopColor: '#e5e7eb', borderTopStyle: 'solid' }}>
+                   <Text style={[styles.detailValue, { color: '#16a34a', fontWeight: 'bold' }]}>
+                     Completed: {formatDate(item.completed_date)}
+                   </Text>
+                 </View>
+               )}
+             </View>
+           );
+         })}
 
-          {/* Page Number */}
-          <Text 
-            style={styles.pageNumber} 
-            render={({ pageNumber, totalPages }) => `หน้า ${pageNumber} จาก ${totalPages}`} 
-            fixed 
-          />
+         {/* Page Number */}
+         <Text 
+           style={styles.pageNumber} 
+           render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} 
+           fixed 
+         />
 
-          {/* Footer */}
-          <View style={styles.footer} fixed>
-            <Text>รายงานนี้สร้างโดยอัตโนมัติจากระบบจัดการสิ่งอำนวยความสะดวก</Text>
-            <Text>© 2025 - ข้อมูลลับและเป็นกรรมสิทธิ์ของบริษัท</Text>
-          </View>
-        </Page>
-      )}
-    </Document>
-  );
+         {/* Footer */}
+         <View style={styles.footer} fixed>
+           <Text>This report was automatically generated by the Facility Management System</Text>
+           <Text>© 2025 - Confidential and Proprietary Information</Text>
+         </View>
+       </Page>
+     )}
+   </Document>
+ );
 };
 
 export default MaintenancePDFDocument;

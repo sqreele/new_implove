@@ -43,49 +43,46 @@ export interface PropertyDetails {
   [key: string]: any; // Allow any other properties
 }
 
-// ✅ Updated Machine details interface based on your actual API
+// ✅ Fixed Machine details interface with consistent optional properties
 export interface MachineDetails {
   machine_id: string;
   name: string;
-  status: string; // "active" | "inactive" etc.
-  location?: string; // Present in PM data
-  id?: number; // Present in machines list API
-  property_name?: string; // Present in machines list API
-  maintenance_count?: number; // Present in machines list API
-  next_maintenance_date?: string | null; // Present in machines list API
-  last_maintenance_date?: string | null; // Present in machines list API
+  status: string;
+  location?: string; // Optional since not always present
+  id?: number;
+  property_name?: string;
+  maintenance_count?: number;
+  next_maintenance_date?: string | null;
+  last_maintenance_date?: string | null;
 }
 
-// ✅ Updated Preventive Maintenance main interface
+// ✅ Fixed Preventive Maintenance main interface
 export interface PreventiveMaintenance {
   id?: number;
   pm_id: string;
   pmtitle?: string;
-  job_description?: string | null; // Added from your API
-  machine_id?: string; // Single machine ID (legacy/compatibility)
-  machines?: MachineDetails[] | null; // ✅ Always an array of MachineDetails now
-  topics?: Topic[] | number[] | null;
+  job_description?: string | null;
+  machine_id?: string; // Legacy field (optional)
+  machines?: MachineDetails[] | null; // Current field - can be null or array
+  topics?: Topic[] | null;
   scheduled_date: string;
   completed_date?: string | null;
   frequency: FrequencyType;
   custom_days?: number | null;
   next_due_date?: string | null;
-  before_image?: MaintenanceImage | string | null;
-  after_image?: MaintenanceImage | string | null;
-  before_image_url?: string | null;
-  after_image_url?: string | null;
-  notes?: string | null;
   status?: string;
   property_id?: string | null;
-  is_overdue?: boolean;
-  created_by?: number; // Added from your API
+  notes?: string | null;
+  before_image_url?: string | null;
+  after_image_url?: string | null;
+  created_by?: number;
 }
 
 // Request structure for creating/updating maintenance
 export interface PreventiveMaintenanceRequest {
   pmtitle?: string;
   property_id?: string | PropertyDetails | null;
-  job_description?: string; // Added
+  job_description?: string;
   
   // Machine relationship fields
   machine_id?: string;  // Single machine association
@@ -204,7 +201,7 @@ export function getImageUrl(image: MaintenanceImage | any | null | undefined): s
   return null;
 }
 
-// ✅ Updated helper to safely get machine details - now expects MachineDetails
+// ✅ Fixed helper to safely get machine details
 export function getMachineDetails(machine: MachineDetails | null | undefined): { id: string, name: string | null } {
   if (!machine) return { id: 'Unknown', name: null };
   
@@ -254,7 +251,7 @@ export interface PMResponse {
   };
 }
 
-// ✅ Updated helper to get machine display name - simplified for MachineDetails[]
+// ✅ Helper to get machine display name
 export function getMachineDisplayName(item: PreventiveMaintenance): string {
   // If machines array exists and has items
   if (item.machines && item.machines.length > 0) {
@@ -270,7 +267,7 @@ export function getMachineDisplayName(item: PreventiveMaintenance): string {
   return 'No Machine Assigned';
 }
 
-// ✅ New helper functions for consistent machine handling
+// ✅ Helper functions for consistent machine handling with proper null checks
 export function getMachinesString(machines: MachineDetails[] | null | undefined): string {
   if (!machines || machines.length === 0) return 'No machines assigned';
   

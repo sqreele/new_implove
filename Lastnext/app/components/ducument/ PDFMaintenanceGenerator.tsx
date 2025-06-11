@@ -23,8 +23,9 @@ import {
   Topic,
   determinePMStatus,
   getImageUrl,
-  getMachinesString,  // ✅ Import from models
-  getLocationString   // ✅ Import from models
+  getMachinesString,
+  getLocationString,
+  itemMatchesMachine
 } from '@/app/lib/preventiveMaintenanceModels';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext';
 import { useRouter } from 'next/navigation';
@@ -86,9 +87,6 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     return (topics as number[]).join(', ');
   };
 
-  // ✅ Remove the old getMachinesString function - we're importing it from models
-  // ✅ Remove the old getLocationString function - we're importing it from models
-
   // Helper function to get safe image URL
   const getSafeImageUrl = (imageUrl: string | null | undefined): string | undefined => {
     if (!imageUrl) return undefined;
@@ -96,18 +94,14 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
     return url || undefined;
   };
 
-  // ✅ Updated client-side filtering with proper machine handling
+  // ✅ Updated client-side filtering with imported functions
   const filteredData = maintenanceData.filter((item: PreventiveMaintenance) => {
     const actualStatus = getTaskStatus(item);
     const statusMatch = filterStatus === 'all' || actualStatus === filterStatus;
     const frequencyMatch = filterFrequency === 'all' || item.frequency === filterFrequency;
     
-    // ✅ Updated machine filtering - now expects MachineDetails[]
-    const machineMatch = filterMachine === 'all' || 
-      (item.machines && item.machines.some(machine => {
-        const name = machine.name || machine.machine_id;
-        return name === filterMachine;
-      }));
+    // ✅ Use imported itemMatchesMachine function
+    const machineMatch = filterMachine === 'all' || itemMatchesMachine(item, filterMachine);
     
     const searchMatch = !searchTerm || 
       item.pmtitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -763,211 +757,208 @@ const PDFMaintenanceGenerator: React.FC<PDFMaintenanceGeneratorProps> = ({
          <h2 className="text-xl font-semibold mb-4 flex items-center">
            <Settings className="h-5 w-5 mr-2" />
            Summary Statistics
-           </h2>
+         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">{filteredData.length}</div>
             <div className="text-sm text-gray-600">Total Tasks</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {filteredData.filter(item => getTaskStatus(item) === 'completed').length}
-            </div>
-            <div className="text-sm text-gray-600">Completed</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">
-              {filteredData.filter(item => getTaskStatus(item) === 'pending').length}
-            </div>
-            <div className="text-sm text-gray-600">Pending</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">
-              {filteredData.filter(item => getTaskStatus(item) === 'overdue').length}
-            </div>
-            <div className="text-sm text-gray-600">Overdue</div>
-          </div>
-        </div>
-      </div>
+          <div className="text-2xl font-bold text-green-600">
+             {filteredData.filter(item => getTaskStatus(item) === 'completed').length}
+           </div>
+           <div className="text-sm text-gray-600">Completed</div>
+         </div>
+         <div className="text-center">
+           <div className="text-2xl font-bold text-yellow-600">
+             {filteredData.filter(item => getTaskStatus(item) === 'pending').length}
+           </div>
+           <div className="text-sm text-gray-600">Pending</div>
+         </div>
+         <div className="text-center">
+           <div className="text-2xl font-bold text-red-600">
+             {filteredData.filter(item => getTaskStatus(item) === 'overdue').length}
+           </div>
+           <div className="text-sm text-gray-600">Overdue</div>
+         </div>
+       </div>
+     </div>
 
-      {/* Maintenance Tasks Table */}
-      {filteredData.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <CheckCircle className="h-5 w-5 mr-2" />
-            Maintenance Tasks
-          </h2>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Task ID</th>
-                  <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Title</th>
-                  <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Date</th>
-                  <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Status</th>
-                  <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Frequency</th>
-                  <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Machines</th>
-                  <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Topics</th>
-                  <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Location</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredData.map((item) => (
-                  <tr key={item.id}>
-                    <td className="border border-gray-300 px-3 py-2 font-mono text-xs">{item.pm_id}</td>
-                    <td className="border border-gray-300 px-3 py-2 font-medium text-xs">
-                      {item.pmtitle || 'No title'}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-xs">{formatDate(item.scheduled_date)}</td>
-                    <td className={`border border-gray-300 px-3 py-2 font-medium text-xs ${getStatusColor(item)}`}>
-                      <span className="capitalize">{getTaskStatus(item)}</span>
-                    </td>
-                    <td className={`border border-gray-300 px-3 py-2 font-medium text-xs ${getFrequencyColor(item.frequency)}`}>
-                      <span className="capitalize">{item.frequency}</span>
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-xs">
-                      {/* ✅ Use imported getMachinesString function */}
-                      {getMachinesString(item.machines)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-xs">
-                      {getTopicsString(item.topics)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-xs">
-                      {/* ✅ Use imported getLocationString function */}
-                      {getLocationString(item)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+     {/* Maintenance Tasks Table */}
+     {filteredData.length > 0 && (
+       <div className="mb-8">
+         <h2 className="text-xl font-semibold mb-4 flex items-center">
+           <CheckCircle className="h-5 w-5 mr-2" />
+           Maintenance Tasks
+         </h2>
+         
+         <div className="overflow-x-auto">
+           <table className="w-full border-collapse border border-gray-300">
+             <thead>
+               <tr className="bg-gray-100">
+                 <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Task ID</th>
+                 <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Title</th>
+                 <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Date</th>
+                 <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Status</th>
+                 <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Frequency</th>
+                 <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Machines</th>
+                 <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Topics</th>
+                 <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">Location</th>
+               </tr>
+             </thead>
+             <tbody>
+               {filteredData.map((item) => (
+                 <tr key={item.id}>
+                   <td className="border border-gray-300 px-3 py-2 font-mono text-xs">{item.pm_id}</td>
+                   <td className="border border-gray-300 px-3 py-2 font-medium text-xs">
+                     {item.pmtitle || 'No title'}
+                   </td>
+                   <td className="border border-gray-300 px-3 py-2 text-xs">{formatDate(item.scheduled_date)}</td>
+                   <td className={`border border-gray-300 px-3 py-2 font-medium text-xs ${getStatusColor(item)}`}>
+                     <span className="capitalize">{getTaskStatus(item)}</span>
+                   </td>
+                   <td className={`border border-gray-300 px-3 py-2 font-medium text-xs ${getFrequencyColor(item.frequency)}`}>
+                     <span className="capitalize">{item.frequency}</span>
+                   </td>
+                   <td className="border border-gray-300 px-3 py-2 text-xs">
+                     {getMachinesString(item.machines)}
+                   </td>
+                   <td className="border border-gray-300 px-3 py-2 text-xs">
+                     {getTopicsString(item.topics)}
+                   </td>
+                   <td className="border border-gray-300 px-3 py-2 text-xs">
+                     {getLocationString(item)}
+                   </td>
+                 </tr>
+               ))}
+             </tbody>
+           </table>
+         </div>
+       </div>
+     )}
 
-      {/* Detailed View Section */}
-      {includeDetails && filteredData.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-6 flex items-center">
-            <AlertCircle className="h-5 w-5 mr-2" />
-            Detailed Task Information
-          </h2>
-          
-          {filteredData.map((item) => (
-            <div key={item.id} className="mb-6 border border-gray-300 rounded-lg p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {item.pmtitle || 'No title'} ({item.pm_id})
-                  </h3>
-                  <div className="space-y-1 text-sm">
-                    <div><strong>Scheduled Date:</strong> {formatDate(item.scheduled_date)}</div>
-                    <div><strong>Status:</strong> <span className={`font-medium ${getStatusColor(item)} capitalize`}>{getTaskStatus(item)}</span></div>
-                    <div><strong>Frequency:</strong> <span className={`font-medium ${getFrequencyColor(item.frequency)} capitalize`}>{item.frequency}</span></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="space-y-1 text-sm">
-                    {/* ✅ Use imported functions */}
-                    <div><strong>Machines:</strong> {getMachinesString(item.machines)}</div>
-                    <div><strong>Topics:</strong> {getTopicsString(item.topics)}</div>
-                    <div><strong>Location:</strong> {getLocationString(item)}</div>
-                  </div>
-                </div>
-              </div>
-              
-              {item.notes && (
-                <div className="border-t border-gray-200 pt-3">
-                  <h4 className="font-medium text-gray-900 mb-2">Notes:</h4>
-                  <p className="text-sm text-gray-700">{item.notes}</p>
-                </div>
-              )}
+     {/* Detailed View Section */}
+     {includeDetails && filteredData.length > 0 && (
+       <div className="mb-8">
+         <h2 className="text-xl font-semibold mb-6 flex items-center">
+           <AlertCircle className="h-5 w-5 mr-2" />
+           Detailed Task Information
+         </h2>
+         
+         {filteredData.map((item) => (
+           <div key={item.id} className="mb-6 border border-gray-300 rounded-lg p-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+               <div>
+                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                   {item.pmtitle || 'No title'} ({item.pm_id})
+                 </h3>
+                 <div className="space-y-1 text-sm">
+                   <div><strong>Scheduled Date:</strong> {formatDate(item.scheduled_date)}</div>
+                   <div><strong>Status:</strong> <span className={`font-medium ${getStatusColor(item)} capitalize`}>{getTaskStatus(item)}</span></div>
+                   <div><strong>Frequency:</strong> <span className={`font-medium ${getFrequencyColor(item.frequency)} capitalize`}>{item.frequency}</span></div>
+                 </div>
+               </div>
+               <div>
+                 <div className="space-y-1 text-sm">
+                   <div><strong>Machines:</strong> {getMachinesString(item.machines)}</div>
+                   <div><strong>Topics:</strong> {getTopicsString(item.topics)}</div>
+                   <div><strong>Location:</strong> {getLocationString(item)}</div>
+                 </div>
+               </div>
+             </div>
+             
+             {item.notes && (
+               <div className="border-t border-gray-200 pt-3">
+                 <h4 className="font-medium text-gray-900 mb-2">Notes:</h4>
+                 <p className="text-sm text-gray-700">{item.notes}</p>
+               </div>
+             )}
 
-              {includeImages && (item.before_image_url || item.after_image_url) && (
-                <div className="border-t border-gray-200 pt-3 mt-3">
-                  <h4 className="font-medium text-gray-900 mb-3">Images:</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {item.before_image_url && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">Before:</p>
-                        <img 
-                          src={imageDataUrls[`before_${item.id}`] || getSafeImageUrl(item.before_image_url)} 
-                          alt="Before maintenance"
-                          className="w-full h-auto rounded border border-gray-300"
-                          style={{ 
-                            maxHeight: '250px', 
-                            objectFit: 'contain',
-                            display: 'block',
-                            margin: '0 auto',
-                            backgroundColor: '#f9f9f9'
-                          }}
-                          crossOrigin="anonymous"
-                          onLoad={(e) => {
-                            console.log('Before image loaded for item:', item.id);
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                          onError={(e) => {
-                            console.warn('Failed to load before image for item:', item.id);
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                    {item.after_image_url && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">After:</p>
-                        <img 
-                          src={imageDataUrls[`after_${item.id}`] || getSafeImageUrl(item.after_image_url)} 
-                          alt="After maintenance"
-                          className="w-full h-auto rounded border border-gray-300"
-                          style={{ 
-                            maxHeight: '250px', 
-                            objectFit: 'contain',
-                            display: 'block',
-                            margin: '0 auto',
-                            backgroundColor: '#f9f9f9'
-                          }}
-                          crossOrigin="anonymous"
-                          onLoad={(e) => {
-                            console.log('After image loaded for item:', item.id);
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                          onError={(e) => {
-                            console.warn('Failed to load after image for item:', item.id);
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+             {includeImages && (item.before_image_url || item.after_image_url) && (
+               <div className="border-t border-gray-200 pt-3 mt-3">
+                 <h4 className="font-medium text-gray-900 mb-3">Images:</h4>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   {item.before_image_url && (
+                     <div>
+                       <p className="text-sm font-medium text-gray-700 mb-2">Before:</p>
+                       <img 
+                         src={imageDataUrls[`before_${item.id}`] || getSafeImageUrl(item.before_image_url)} 
+                         alt="Before maintenance"
+                         className="w-full h-auto rounded border border-gray-300"
+                         style={{ 
+                           maxHeight: '250px', 
+                           objectFit: 'contain',
+                           display: 'block',
+                           margin: '0 auto',
+                           backgroundColor: '#f9f9f9'
+                         }}
+                         crossOrigin="anonymous"
+                         onLoad={(e) => {
+                           console.log('Before image loaded for item:', item.id);
+                           e.currentTarget.style.backgroundColor = 'transparent';
+                         }}
+                         onError={(e) => {
+                           console.warn('Failed to load before image for item:', item.id);
+                           e.currentTarget.style.display = 'none';
+                         }}
+                       />
+                     </div>
+                   )}
+                   {item.after_image_url && (
+                     <div>
+                       <p className="text-sm font-medium text-gray-700 mb-2">After:</p>
+                       <img 
+                         src={imageDataUrls[`after_${item.id}`] || getSafeImageUrl(item.after_image_url)} 
+                         alt="After maintenance"
+                         className="w-full h-auto rounded border border-gray-300"
+                         style={{ 
+                           maxHeight: '250px', 
+                           objectFit: 'contain',
+                           display: 'block',
+                           margin: '0 auto',
+                           backgroundColor: '#f9f9f9'
+                         }}
+                         crossOrigin="anonymous"
+                         onLoad={(e) => {
+                           console.log('After image loaded for item:', item.id);
+                           e.currentTarget.style.backgroundColor = 'transparent';
+                         }}
+                         onError={(e) => {
+                           console.warn('Failed to load after image for item:', item.id);
+                           e.currentTarget.style.display = 'none';
+                         }}
+                       />
+                     </div>
+                   )}
+                 </div>
+               </div>
+             )}
+           </div>
+         ))}
+       </div>
+     )}
 
-      {/* Footer */}
-      <div className="border-t border-gray-300 pt-4 text-center text-sm text-gray-500">
-        <p>This report was automatically generated by the Facility Management System</p>
-        <p>© 2025 - Confidential and Proprietary Information</p>
-      </div>
-    </div>
+     {/* Footer */}
+     <div className="border-t border-gray-300 pt-4 text-center text-sm text-gray-500">
+       <p>This report was automatically generated by the Facility Management System</p>
+       <p>© 2025 - Confidential and Proprietary Information</p>
+     </div>
+   </div>
 
-    {/* No data message */}
-    {filteredData.length === 0 && (
-      <div className="no-print text-center py-12">
-        <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No maintenance tasks found</h3>
-        <p className="text-gray-600">
-          {maintenanceData.length === 0 
-            ? "No maintenance data is available. Please ensure maintenance records are loaded."
-            : "Try adjusting your filters to see more results."
-          }
-        </p>
-      </div>
-    )}
-  </div>
+   {/* No data message */}
+   {filteredData.length === 0 && (
+     <div className="no-print text-center py-12">
+       <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+       <h3 className="text-lg font-medium text-gray-900 mb-2">No maintenance tasks found</h3>
+       <p className="text-gray-600">
+         {maintenanceData.length === 0 
+           ? "No maintenance data is available. Please ensure maintenance records are loaded."
+           : "Try adjusting your filters to see more results."
+         }
+       </p>
+     </div>
+   )}
+ </div>
 );
 };
 
