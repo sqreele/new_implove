@@ -107,112 +107,117 @@ export const PreventiveMaintenanceProvider: React.FC<PreventiveMaintenanceProvid
   }, []);
 
   // ✅ Simplified fetchMaintenanceItems using imported helper function
-  const fetchMaintenanceItems = useCallback(
-    async (params?: SearchParams) => {
-      setIsLoading(true);
-      clearError();
+// ✅ Updated fetchMaintenanceItems with better machine filtering logic
+const fetchMaintenanceItems = useCallback(
+  async (params?: SearchParams) => {
+    setIsLoading(true);
+    clearError();
 
-      try {
-        const fetchParams = { ...filterParams, ...params };
-        const queryParams: Record<string, string | number> = {};
+    try {
+      const fetchParams = { ...filterParams, ...params };
+      const queryParams: Record<string, string | number> = {};
 
-        console.log('🔄 Fetching maintenance items with params:', fetchParams);
+      console.log('🔄 Fetching maintenance items with params:', fetchParams);
 
-        // Add all filter parameters
-        if (fetchParams.status) queryParams.status = fetchParams.status;
-        if (fetchParams.frequency) queryParams.frequency = fetchParams.frequency;
-        if (fetchParams.page) queryParams.page = fetchParams.page;
-        if (fetchParams.page_size) queryParams.page_size = fetchParams.page_size;
-        if (fetchParams.search) queryParams.search = fetchParams.search;
-        if (fetchParams.start_date) queryParams.date_from = fetchParams.start_date;
-        if (fetchParams.end_date) queryParams.date_to = fetchParams.end_date;
-        if (fetchParams.property_id) queryParams.property_id = fetchParams.property_id;
-        if (fetchParams.topic_id) queryParams.topic_id = fetchParams.topic_id;
+      // Add all filter parameters
+      if (fetchParams.status) queryParams.status = fetchParams.status;
+      if (fetchParams.frequency) queryParams.frequency = fetchParams.frequency;
+      if (fetchParams.page) queryParams.page = fetchParams.page;
+      if (fetchParams.page_size) queryParams.page_size = fetchParams.page_size;
+      if (fetchParams.search) queryParams.search = fetchParams.search;
+      if (fetchParams.start_date) queryParams.date_from = fetchParams.start_date;
+      if (fetchParams.end_date) queryParams.date_to = fetchParams.end_date;
+      if (fetchParams.property_id) queryParams.property_id = fetchParams.property_id;
+      if (fetchParams.topic_id) queryParams.topic_id = fetchParams.topic_id;
 
-        let finalItems: PreventiveMaintenance[] = [];
-        let finalCount = 0;
+      let finalItems: PreventiveMaintenance[] = [];
+      let finalCount = 0;
 
-        // ✅ Simplified machine filtering using imported function
-        if (fetchParams.machine_id) {
-          console.log(`🎯 Machine filter requested: ${fetchParams.machine_id}`);
+      // ✅ Enhanced machine filtering - always use API filtering when available
+      if (fetchParams.machine_id) {
+        console.log(`🎯 Machine filter requested: ${fetchParams.machine_id}`);
+        
+        // Use API filtering with machine parameter
+        queryParams.machine = fetchParams.machine_id; // API expects 'machine' not 'machine_id'
+        
+        try {
+          const response = await preventiveMaintenanceService.getAllPreventiveMaintenance(queryParams);
           
-          // Try API filtering first
-          try {
-            const machineResponse = await preventiveMaintenanceService.getPreventiveMaintenanceByMachine(
-              fetchParams.machine_id,
-              queryParams
-            );
-
-            if (machineResponse.success && machineResponse.data) {
-              if (Array.isArray(machineResponse.data)) {
-                finalItems = machineResponse.data;
-                finalCount = finalItems.length;
-              } else if (machineResponse.data && 'results' in machineResponse.data) {
-                finalItems = (machineResponse.data as any).results;
-                finalCount = (machineResponse.data as any).count || finalItems.length;
-              }
-              
-              console.log(`✅ Machine filtering successful: ${finalItems.length} items found`);
-            } else {
-              throw new Error('Machine filtering failed');
-            }
-          } catch (machineError) {
-            console.log('⚠️ Machine filtering failed, falling back to client-side filtering');
-            
-            // Fallback: Get all items and filter client-side using imported function
-            const allResponse = await preventiveMaintenanceService.getAllPreventiveMaintenance(queryParams);
-            
-            if (allResponse.success && allResponse.data) {
-              let allItems: PreventiveMaintenance[] = [];
-              
-              if (Array.isArray(allResponse.data)) {
-                allItems = allResponse.data;
-              } else if (allResponse.data && 'results' in allResponse.data) {
-                allItems = (allResponse.data as any).results;
-              }
-
-              // ✅ Use imported itemMatchesMachine function
-              finalItems = allItems.filter(item => itemMatchesMachine(item, fetchParams.machine_id!));
+          if (response.success && response.data) {
+            if (Array.isArray(response.data)) {
+              finalItems = response.data;
               finalCount = finalItems.length;
-              
-              console.log(`🔧 Client-side filtering: ${allItems.length} -> ${finalItems.length} items`);
+            } else if (response.data && 'results' in response.data) {
+              finalItems = (response.data as any).results;
+              finalCount = (response.data as any).count || finalItems.length;
             }
+            
+            console.log(`✅ API machine filtering successful: ${finalItems.length} items found`);
+            
+            // ✅ Skip client-side filtering since API already filtered
+            // The API is working correctly, so we don't need additional client-side filtering
+            
+          } else {
+            throw new Error('API machine filtering failed');
+          }
+        } catch (apiError) {
+          console.warn('⚠️ API machine filtering failed, falling back to client-side filtering');
+          
+          // Fallback: Get all items and filter client-side
+          const allResponse = await preventiveMaintenanceService.getAllPreventiveMaintenance({
+            ...queryParams,
+            machine: undefined // Remove machine filter for getting all items
+          });
+          
+          if (allResponse.success && allResponse.data) {
+            let allItems: PreventiveMaintenance[] = [];
+            
+            if (Array.isArray(allResponse.data)) {
+              allItems = allResponse.data;
+            } else if (allResponse.data && 'results' in allResponse.data) {
+              allItems = (allResponse.data as any).results;
+            }
+
+            // Use imported itemMatchesMachine function
+            finalItems = allItems.filter(item => itemMatchesMachine(item, fetchParams.machine_id!));
+            finalCount = finalItems.length;
+            
+            console.log(`🔧 Client-side filtering: ${allItems.length} -> ${finalItems.length} items`);
+          }
+        }
+      } else {
+        // No machine filter, use standard fetching
+        const response = await preventiveMaintenanceService.getAllPreventiveMaintenance(queryParams);
+
+        if (response.success && response.data) {
+          if (Array.isArray(response.data)) {
+            finalItems = response.data;
+            finalCount = finalItems.length;
+          } else if (response.data && 'results' in response.data) {
+            finalItems = (response.data as any).results;
+            finalCount = (response.data as any).count || finalItems.length;
           }
         } else {
-          // No machine filter, use standard fetching
-          if (fetchParams.machine_id) queryParams.machine_id = fetchParams.machine_id;
-         
-         const response = await preventiveMaintenanceService.getAllPreventiveMaintenance(queryParams);
+          throw new Error(response.message || 'Failed to fetch maintenance items');
+        }
+      }
 
-         if (response.success && response.data) {
-           if (Array.isArray(response.data)) {
-             finalItems = response.data;
-             finalCount = finalItems.length;
-           } else if (response.data && 'results' in response.data) {
-             finalItems = (response.data as any).results;
-             finalCount = (response.data as any).count || finalItems.length;
-           }
-         } else {
-           throw new Error(response.message || 'Failed to fetch maintenance items');
-         }
-       }
-
-       setMaintenanceItems(finalItems);
-       setTotalCount(finalCount);
-       
-       console.log(`📊 Final result: ${finalItems.length} items loaded`);
-       
-     } catch (err: any) {
-       console.error('❌ Error fetching maintenance items:', err);
-       setError(err.message || 'Failed to fetch maintenance items');
-       setMaintenanceItems([]);
-       setTotalCount(0);
-     } finally {
-       setIsLoading(false);
-     }
-   },
-   [filterParams, clearError] // ✅ Removed itemMatchesMachine from dependencies since it's imported
- );
+      setMaintenanceItems(finalItems);
+      setTotalCount(finalCount);
+      
+      console.log(`📊 Final result: ${finalItems.length} items loaded, total count: ${finalCount}`);
+      
+    } catch (err: any) {
+      console.error('❌ Error fetching maintenance items:', err);
+      setError(err.message || 'Failed to fetch maintenance items');
+      setMaintenanceItems([]);
+      setTotalCount(0);
+    } finally {
+      setIsLoading(false);
+    }
+  },
+  [filterParams, clearError]
+);
 
  // Enhanced fetchMaintenanceByMachine function
  const fetchMaintenanceByMachine = useCallback(

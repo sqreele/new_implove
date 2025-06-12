@@ -287,24 +287,46 @@ export function getLocationString(item: PreventiveMaintenance): string {
   return item.property_id || 'Unknown';
 }
 
-// ✅ Machine filtering helper for consistent filtering
+// ✅ Fixed machine filtering function with better debugging
 export function itemMatchesMachine(item: PreventiveMaintenance, machineFilter: string): boolean {
   if (!machineFilter || machineFilter === 'all') return true;
   
   // Check if item has machines array
   if (!item.machines || !Array.isArray(item.machines) || item.machines.length === 0) {
+    console.log(`❌ No machines array for item ${item.pm_id}`);
     return false;
   }
   
   // Check if any machine in the array matches the filter
-  return item.machines.some(machine => {
+  const hasMatch = item.machines.some(machine => {
     if (typeof machine === 'object' && machine !== null) {
-      // Match by machine_id or name
-      return machine.machine_id === machineFilter || 
-             machine.name === machineFilter;
+      const machineIdMatch = machine.machine_id === machineFilter;
+      const nameMatch = machine.name === machineFilter;
+      
+      // Debug each machine check
+      console.log(`🔍 Checking machine in item ${item.pm_id}:`, {
+        machine_id: machine.machine_id,
+        name: machine.name,
+        filter: machineFilter,
+        machineIdMatch,
+        nameMatch,
+        anyMatch: machineIdMatch || nameMatch
+      });
+      
+      return machineIdMatch || nameMatch;
     }
+    
+    console.log(`❌ Invalid machine object in item ${item.pm_id}:`, machine);
     return false;
   });
+  
+  if (hasMatch) {
+    console.log(`✅ Item ${item.pm_id} matches filter "${machineFilter}"`);
+  } else {
+    console.log(`❌ Item ${item.pm_id} does NOT match filter "${machineFilter}"`);
+  }
+  
+  return hasMatch;
 }
 export function getUniqueMachinesFromItems(items: PreventiveMaintenance[]): Array<{id: string, label: string}> {
   const machineMap = new Map<string, {id: string, label: string}>();
