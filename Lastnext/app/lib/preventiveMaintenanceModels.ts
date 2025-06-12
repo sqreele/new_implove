@@ -288,8 +288,14 @@ export function getLocationString(item: PreventiveMaintenance): string {
 }
 
 // ✅ Fixed machine filtering function with better debugging
+// In preventiveMaintenanceModels.ts, update this function:
 export function itemMatchesMachine(item: PreventiveMaintenance, machineFilter: string): boolean {
   if (!machineFilter || machineFilter === 'all') return true;
+  
+  // Normalize the filter for comparison
+  const normalizedFilter = machineFilter.trim().toLowerCase();
+  
+  console.log(`🔍 Checking item ${item.pm_id} against filter "${machineFilter}"`);
   
   // Check if item has machines array
   if (!item.machines || !Array.isArray(item.machines) || item.machines.length === 0) {
@@ -300,20 +306,33 @@ export function itemMatchesMachine(item: PreventiveMaintenance, machineFilter: s
   // Check if any machine in the array matches the filter
   const hasMatch = item.machines.some(machine => {
     if (typeof machine === 'object' && machine !== null) {
+      // Check machine_id (exact match)
       const machineIdMatch = machine.machine_id === machineFilter;
+      
+      // Check machine_id (case insensitive)
+      const machineIdCaseInsensitive = machine.machine_id?.toLowerCase() === normalizedFilter;
+      
+      // Check name (exact match)
       const nameMatch = machine.name === machineFilter;
       
-      // Debug each machine check
-      console.log(`🔍 Checking machine in item ${item.pm_id}:`, {
+      // Check name (case insensitive)
+      const nameCaseInsensitive = machine.name?.toLowerCase() === normalizedFilter;
+      
+      // Check name (partial match)
+      const namePartialMatch = machine.name?.toLowerCase().includes(normalizedFilter);
+      
+      console.log(`🔍 Machine comparison for ${machine.machine_id}:`, {
         machine_id: machine.machine_id,
         name: machine.name,
         filter: machineFilter,
         machineIdMatch,
+        machineIdCaseInsensitive,
         nameMatch,
-        anyMatch: machineIdMatch || nameMatch
+        nameCaseInsensitive,
+        namePartialMatch
       });
       
-      return machineIdMatch || nameMatch;
+      return machineIdMatch || machineIdCaseInsensitive || nameMatch || nameCaseInsensitive;
     }
     
     console.log(`❌ Invalid machine object in item ${item.pm_id}:`, machine);

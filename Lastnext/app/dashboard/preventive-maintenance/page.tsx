@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext';
 import { useFilters } from '@/app/lib/FilterContext';
 import { PreventiveMaintenance, getMachinesString } from '@/app/lib/preventiveMaintenanceModels';
+import preventiveMaintenanceService from '@/app/lib/PreventiveMaintenanceService';
 import { 
   Calendar, 
   Search, 
@@ -29,7 +30,8 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
-  RefreshCw
+  RefreshCw,
+  Bug // For debug button
 } from 'lucide-react';
 
 export default function PreventiveMaintenanceListPage() {
@@ -46,7 +48,9 @@ export default function PreventiveMaintenanceListPage() {
     fetchMaintenanceItems,
     deleteMaintenance,
     setFilterParams,
-    clearError
+    clearError,
+    debugMachineFilter,
+    testMachineFiltering
   } = usePreventiveMaintenance();
 
   // UI state
@@ -98,6 +102,29 @@ export default function PreventiveMaintenanceListPage() {
     return { total: maintenanceItems.length, completed, overdue, pending };
   }, [maintenanceItems]);
 
+  // ✅ DEBUG: Monitor filter changes
+  useEffect(() => {
+    console.log('🔍 Current filter state:', {
+      currentFilters: currentFilters,
+      filterParams: filterParams,
+      machine_filter: currentFilters.machine,
+      machine_id_filter: filterParams.machine_id
+    });
+    
+    if (currentFilters.machine === 'M257E5AC03B') {
+      console.log('🎯 Filtering for M257E5AC03B');
+      console.log('Available machines:', machines.map(m => ({ id: m.machine_id, name: m.name })));
+      console.log('Maintenance items count:', maintenanceItems.length);
+      
+      // Check which items should match
+      maintenanceItems.forEach(item => {
+        if (item.machines?.some(m => m.machine_id === 'M257E5AC03B')) {
+          console.log('✅ Found matching item:', item.pm_id, item.pmtitle);
+        }
+      });
+    }
+  }, [currentFilters, filterParams, machines, maintenanceItems]);
+
   // ✅ Optimized sync with debouncing
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -115,6 +142,7 @@ export default function PreventiveMaintenanceListPage() {
 
       // Only update if params actually changed
       if (JSON.stringify(newParams) !== JSON.stringify(filterParams)) {
+        console.log('📝 Updating filter params:', newParams);
         setFilterParams(newParams);
       }
     }, 300);
@@ -234,6 +262,7 @@ export default function PreventiveMaintenanceListPage() {
 
   // ✅ Enhanced filter handlers
   const handleFilterChange = useCallback((key: keyof typeof currentFilters, value: string | number) => {
+    console.log(`🔧 Filter change: ${key} = ${value}`);
     updateFilter(key, value);
     
     // Reset to first page when filtering
@@ -243,6 +272,7 @@ export default function PreventiveMaintenanceListPage() {
   }, [updateFilter]);
 
   const clearAllFilters = useCallback(() => {
+    console.log('🧹 Clearing all filters');
     clearFilters();
     setSelectedItems([]);
   }, [clearFilters]);
@@ -303,6 +333,12 @@ export default function PreventiveMaintenanceListPage() {
   const handleRefresh = useCallback(async () => {
     await fetchMaintenanceItems();
   }, [fetchMaintenanceItems]);
+
+  // ✅ DEBUG handlers
+
+  const handleDebugMachine = useCallback(async () => {
+    await debugMachineFilter('M257E5AC03B');
+  }, [debugMachineFilter]);
 
   // Pagination
   const totalPages = Math.ceil(totalCount / currentFilters.pageSize);
@@ -415,6 +451,9 @@ export default function PreventiveMaintenanceListPage() {
             <h1 className="text-xl font-bold text-gray-900">Maintenance</h1>
             <p className="text-sm text-gray-600">
               {totalCount} tasks • {stats.overdue} overdue
+              {currentFilters.machine && (
+                <span className="text-blue-600"> • Filtered</span>
+              )}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -456,10 +495,35 @@ export default function PreventiveMaintenanceListPage() {
             <h1 className="text-3xl font-bold text-gray-900">Preventive Maintenance</h1>
             <p className="text-gray-600 mt-1">
               Manage your scheduled maintenance tasks
+              {currentFilters.machine && (
+                <span className="text-blue-600 font-medium"> • Filtered by: {getMachineNameById(currentFilters.machine)}</span>
+              )}
             </p>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-3">
+            {/* ✅ DEBUG BUTTONS - Remove in production */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="flex gap-2">
+                <button
+                  onClick={testMachineFiltering}
+                  className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                  title="Test Filtering"
+                >
+                  <Bug className="h-4 w-4 mr-1" />
+                  Test
+                </button>
+                <button
+                  onClick={handleDebugMachine}
+                  className="flex items-center px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm"
+                  title="Debug Machine"
+                >
+                  <Bug className="h-4 w-4 mr-1" />
+                  Debug
+                </button>
+              </div>
+            )}
+            
             <button
               onClick={handleRefresh}
               disabled={isLoading}
@@ -602,131 +666,136 @@ export default function PreventiveMaintenanceListPage() {
             </div>
 
             {/* ✅ Sort options for mobile */}
-            <div className="mb-4">
-              <select
-                value={`${sortBy}-${sortOrder}`}
-                onChange={(e) => {
-                  const [field, order] = e.target.value.split('-') as [typeof sortBy, typeof sortOrder];
-                  setSortBy(field);
-                  setSortOrder(order);
-                }}
-                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              >
-                <option value="date-desc">Date (Newest First)</option>
-                <option value="date-asc">Date (Oldest First)</option>
-                <option value="status-asc">Status (A-Z)</option>
-                <option value="status-desc">Status (Z-A)</option>
-                <option value="frequency-asc">Frequency (A-Z)</option>
-                <option value="frequency-desc">Frequency (Z-A)</option>
-                <option value="machine-asc">Machine (A-Z)</option>
-                <option value="machine-desc">Machine (Z-A)</option>
-              </select>
-            </div>
+           <div className="mb-4">
+             <select
+               value={`${sortBy}-${sortOrder}`}
+               onChange={(e) => {
+                 const [field, order] = e.target.value.split('-') as [typeof sortBy, typeof sortOrder];
+                 setSortBy(field);
+                 setSortOrder(order);
+               }}
+               className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+             >
+               <option value="date-desc">Date (Newest First)</option>
+               <option value="date-asc">Date (Oldest First)</option>
+               <option value="status-asc">Status (A-Z)</option>
+               <option value="status-desc">Status (Z-A)</option>
+               <option value="frequency-asc">Frequency (A-Z)</option>
+               <option value="frequency-desc">Frequency (Z-A)</option>
+               <option value="machine-asc">Machine (A-Z)</option>
+               <option value="machine-desc">Machine (Z-A)</option>
+             </select>
+           </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">
-                {totalCount} tasks found
-              </span>
-              <button
-                onClick={clearAllFilters}
-                className="text-sm text-blue-600 hover:text-blue-800 px-3 py-1"
-              >
-                Clear filters
-              </button>
-            </div>
-          </div>
-        )}
+           <div className="flex justify-between items-center">
+             <span className="text-sm text-gray-600">
+               {totalCount} tasks found
+               {currentFilters.machine && (
+                 <span className="block text-blue-600 font-medium">
+                   Filtered by: {getMachineNameById(currentFilters.machine)}
+                 </span>
+               )}
+             </span>
+             <button
+               onClick={clearAllFilters}
+               className="text-sm text-blue-600 hover:text-blue-800 px-3 py-1"
+             >
+               Clear filters
+             </button>
+           </div>
+         </div>
+       )}
 
-        {/* Desktop Filters Panel */}
-        {showFilters && (
-          <div className="hidden md:block bg-white border border-gray-200 rounded-lg p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-              {/* Search */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Search
-                </label>
-                <div className="relative">
-                  <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by title or ID..."
-                    value={currentFilters.search}
-                    onChange={(e) => handleFilterChange('search', e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
+       {/* Desktop Filters Panel */}
+       {showFilters && (
+         <div className="hidden md:block bg-white border border-gray-200 rounded-lg p-6 mb-6">
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+             {/* Search */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700 mb-2">
+                 Search
+               </label>
+               <div className="relative">
+                 <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                 <input
+                   type="text"
+                   placeholder="Search by title or ID..."
+                   value={currentFilters.search}
+                   onChange={(e) => handleFilterChange('search', e.target.value)}
+                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                 />
+               </div>
+             </div>
 
-              {/* Status Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  value={currentFilters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">All Status</option>
-                  <option value="completed">Completed</option>
-                  <option value="pending">Pending</option>
-                  <option value="overdue">Overdue</option>
-                </select>
-              </div>
+             {/* Status Filter */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700 mb-2">
+                 Status
+               </label>
+               <select
+                 value={currentFilters.status}
+                 onChange={(e) => handleFilterChange('status', e.target.value)}
+                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+               >
+                 <option value="">All Status</option>
+                 <option value="completed">Completed</option>
+                 <option value="pending">Pending</option>
+                 <option value="overdue">Overdue</option>
+               </select>
+             </div>
 
-              {/* Frequency Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Frequency
-                </label>
-                <select
-                  value={currentFilters.frequency}
-                  onChange={(e) => handleFilterChange('frequency', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">All Frequencies</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="biweekly">Bi-weekly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="biannually">Bi-annually</option>
-                  <option value="annually">Annually</option>
-                  <option value="custom">Custom</option>
-                </select>
-              </div>
+             {/* Frequency Filter */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700 mb-2">
+                 Frequency
+               </label>
+               <select
+                 value={currentFilters.frequency}
+                 onChange={(e) => handleFilterChange('frequency', e.target.value)}
+                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+               >
+                 <option value="">All Frequencies</option>
+                 <option value="daily">Daily</option>
+                 <option value="weekly">Weekly</option>
+                 <option value="biweekly">Bi-weekly</option>
+                 <option value="monthly">Monthly</option>
+                 <option value="quarterly">Quarterly</option>
+                 <option value="biannually">Bi-annually</option>
+                 <option value="annually">Annually</option>
+                 <option value="custom">Custom</option>
+               </select>
+             </div>
 
-              {/* ✅ Enhanced Machine Filter for Desktop */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Machine
-                </label>
-                <select
-                  value={currentFilters.machine}
-                  onChange={(e) => handleFilterChange('machine', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">All Machines ({machines.length})</option>
-                  {machineOptions.map((machine) => (
-                    <option key={machine.id} value={machine.id}>
-                      {machine.label} ({machine.count})
-                    </option>
-                  ))}
-                </select>
-              </div>
+             {/* ✅ Enhanced Machine Filter for Desktop */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700 mb-2">
+                 Machine
+               </label>
+               <select
+                 value={currentFilters.machine}
+                 onChange={(e) => handleFilterChange('machine', e.target.value)}
+                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+               >
+                 <option value="">All Machines ({machines.length})</option>
+                 {machineOptions.map((machine) => (
+                   <option key={machine.id} value={machine.id}>
+                     {machine.label} ({machine.count})
+                   </option>
+                 ))}
+               </select>
+             </div>
 
-              {/* Date Range */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={currentFilters.startDate}
-                  onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+             {/* Date Range */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700 mb-2">
+                 Start Date
+               </label>
+               <input
+                 type="date"
+                 value={currentFilters.startDate}
+                 onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+               />
              </div>
 
              <div>
@@ -748,7 +817,7 @@ export default function PreventiveMaintenanceListPage() {
                <span className="text-sm text-gray-600">
                  {totalCount} maintenance tasks found
                  {currentFilters.machine && (
-                   <span className="ml-2 text-blue-600">
+                   <span className="ml-2 text-blue-600 font-medium">
                      • Filtered by: {getMachineNameById(currentFilters.machine)}
                    </span>
                  )}
@@ -834,13 +903,20 @@ export default function PreventiveMaintenanceListPage() {
                }
              </p>
              {activeFiltersCount > 0 ? (
-               <button
-                 onClick={clearAllFilters}
-                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-               >
-                 <X className="h-4 w-4 mr-2" />
-                 Clear Filters
-               </button>
+               <div className="space-y-2">
+                 {currentFilters.machine && (
+                   <p className="text-sm text-blue-600">
+                     No tasks found for machine: {getMachineNameById(currentFilters.machine)}
+                   </p>
+                 )}
+                 <button
+                   onClick={clearAllFilters}
+                   className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                 >
+                   <X className="h-4 w-4 mr-2" />
+                   Clear Filters
+                 </button>
+               </div>
              ) : (
                <Link
                  href="/dashboard/preventive-maintenance/create"
@@ -1009,6 +1085,13 @@ export default function PreventiveMaintenanceListPage() {
                                  {statusInfo.text === 'Overdue' && (
                                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                      High Priority
+                                   </span>
+                                 )}
+
+                                 {/* ✅ Machine filter indicator */}
+                                 {currentFilters.machine && item.machines?.some(m => m.machine_id === currentFilters.machine) && (
+                                   <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                     Filtered Match
                                    </span>
                                  )}
                                </div>

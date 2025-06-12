@@ -766,6 +766,56 @@ class PreventiveMaintenanceService {
       throw handleApiError(error);
     }
   }
+  async debugAPIEndpoint(machineId: string): Promise<void> {
+    console.log(`=== DEBUGGING API ENDPOINT FOR MACHINE: ${machineId} ===`);
+    
+    try {
+      // Test different parameter formats
+      const testParams = [
+        { machine: machineId },
+        { machine_id: machineId },
+        { machines: machineId },
+        { machine_ids: machineId },
+      ];
+  
+      for (const params of testParams) {
+        console.log(`\n🧪 Testing params:`, params);
+        
+        try {
+          const response = await apiClient.get<any>(`${this.baseUrl}/`, { params });
+          const { items } = this.extractItemsFromResponse(response.data);
+          
+          console.log(`📊 Returned ${items.length} items`);
+          
+          // Check first few items
+          items.slice(0, 3).forEach((item, index) => {
+            console.log(`Item ${index + 1}:`, {
+              pm_id: item.pm_id,
+              machine_id: item.machine_id,
+              machines: item.machines?.map(m => ({ id: m.machine_id, name: m.name }))
+            });
+          });
+          
+          // Check if target machine is in results
+          const hasTargetMachine = items.some(item => 
+            item.machines?.some(m => m.machine_id === machineId)
+          );
+          
+          if (hasTargetMachine) {
+            console.log(`✅ Found target machine ${machineId} in results`);
+          } else {
+            console.log(`❌ Target machine ${machineId} NOT found in results`);
+          }
+          
+        } catch (error) {
+          console.log(`❌ Failed with params ${JSON.stringify(params)}:`, (error as Error).message);
+        }
+      }
+      
+    } catch (error) {
+      console.error('Debug failed:', error);
+    }
+  }
 }
 
 export default new PreventiveMaintenanceService();
