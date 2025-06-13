@@ -27,7 +27,6 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
   getFrequencyText
 }) => {
   const statusInfo = getStatusInfo(item);
-  const StatusIcon = statusInfo.icon;
 
   return (
     <div className="px-4 md:px-6 py-4 hover:bg-gray-50 transition-colors">
@@ -54,9 +53,12 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
                     onChange={(e) => onSelect(e.target.checked)}
                     className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                   />
-                  <h3 className="text-sm font-medium text-gray-900 truncate">
+                  <Link 
+                    href={`/dashboard/preventive-maintenance/${item.pm_id}`}
+                    className="text-sm font-medium text-gray-900 hover:text-blue-600 truncate"
+                  >
                     {item.pmtitle || `Task ${item.pm_id}`}
-                  </h3>
+                  </Link>
                 </div>
                 
                 <div className="space-y-1 text-xs text-gray-500">
@@ -81,20 +83,23 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
                   
                   <div className="flex items-center space-x-2">
                     <Link
-                      href={`/preventive-maintenance/${item.pm_id}`}
+                      href={`/dashboard/preventive-maintenance/${item.pm_id}`}
                       className="p-1 text-blue-600 hover:text-blue-800"
+                      title="View Details"
                     >
                       <Eye className="h-4 w-4" />
                     </Link>
                     <Link
-                      href={`/preventive-maintenance/${item.pm_id}/edit`}
+                      href={`/dashboard/preventive-maintenance/edit/${item.pm_id}`}
                       className="p-1 text-gray-600 hover:text-gray-800"
+                      title="Edit"
                     >
                       <Edit className="h-4 w-4" />
                     </Link>
                     <button
                       onClick={() => onDelete(item.pm_id)}
                       className="p-1 text-red-600 hover:text-red-800"
+                      title="Delete"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -108,7 +113,12 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
           <div className="hidden md:block">
             <div className="grid grid-cols-5 gap-4 items-center">
               <div className="text-sm text-gray-900">
-                <div className="font-medium">{item.pmtitle || `Task ${item.pm_id}`}</div>
+                <Link 
+                  href={`/dashboard/preventive-maintenance/${item.pm_id}`}
+                  className="font-medium hover:text-blue-600 block"
+                >
+                  {item.pmtitle || `Task ${item.pm_id}`}
+                </Link>
                 <div className="text-xs text-gray-500">{formatDate(item.scheduled_date)}</div>
               </div>
               
@@ -128,14 +138,14 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
               
               <div className="flex items-center space-x-2">
                 <Link
-                  href={`/preventive-maintenance/${item.pm_id}`}
+                  href={`/dashboard/preventive-maintenance/${item.pm_id}`}
                   className="p-1 text-blue-600 hover:text-blue-800"
-                  title="View"
+                  title="View Details"
                 >
                   <Eye className="h-4 w-4" />
                 </Link>
                 <Link
-                  href={`/preventive-maintenance/${item.pm_id}/edit`}
+                  href={`/dashboard/preventive-maintenance/edit/${item.pm_id}`}
                   className="p-1 text-gray-600 hover:text-gray-800"
                   title="Edit"
                 >
