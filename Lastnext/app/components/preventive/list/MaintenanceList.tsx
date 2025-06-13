@@ -52,7 +52,7 @@ const MaintenanceList: React.FC<MaintenanceListProps> = ({
             />
           </div>
           
-          <div className="flex-1 grid grid-cols-5 gap-4 ml-4">
+          <div className="flex-1 grid grid-cols-6 gap-4 ml-4">
             <button
               onClick={() => onSort('date')}
               className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:text-gray-700 focus:outline-none"
@@ -80,6 +80,10 @@ const MaintenanceList: React.FC<MaintenanceListProps> = ({
             >
               Machine {sortBy === 'machine' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
+            
+            <div className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Procedure
+            </div>
             
             <div className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Actions

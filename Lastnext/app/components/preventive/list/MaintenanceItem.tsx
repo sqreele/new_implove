@@ -117,7 +117,7 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
 
           {/* Desktop Layout */}
           <div className="hidden md:block">
-            <div className="grid grid-cols-5 gap-4 items-center">
+            <div className="grid grid-cols-6 gap-4 items-center">
               <div className="text-sm text-gray-900">
                 <Link 
                   href={`/dashboard/preventive-maintenance/${item.pm_id}`}
@@ -142,11 +142,9 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
                 {getMachineNames(item.machines)}
               </div>
               
-              {item.procedure && (
-                <div className="text-sm text-gray-900 truncate">
-                  {item.procedure}
-                </div>
-              )}
+              <div className="text-sm text-gray-900 truncate">
+                {item.procedure || '-'}
+              </div>
               
               <div className="flex items-center space-x-2">
                 <Link
