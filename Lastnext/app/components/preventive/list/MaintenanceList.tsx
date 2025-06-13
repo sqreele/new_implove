@@ -12,11 +12,7 @@ interface MaintenanceListProps {
   selectedItems: string[];
   onSelectAll: (checked: boolean) => void;
   onSelectItem: (id: string, checked: boolean) => void;
-<<<<<<< HEAD
   onSort: (field: string) => void;
-=======
-  onSort: (field: SortField) => void;
->>>>>>> dbc6bb4 (addfixmaintain)
   onDelete: (id: string) => void;
   sortBy: SortField;
   sortOrder: 'asc' | 'desc';
@@ -41,11 +37,7 @@ const MaintenanceList: React.FC<MaintenanceListProps> = ({
   getStatusInfo,
   getFrequencyText,
   currentFilters,
-<<<<<<< HEAD
 }) => {
-=======
-}: MaintenanceListProps) {
->>>>>>> dbc6bb4 (addfixmaintain)
   return (
     <div className="bg-white md:border md:border-gray-200 md:rounded-lg overflow-hidden">
       {/* Desktop Header */}
