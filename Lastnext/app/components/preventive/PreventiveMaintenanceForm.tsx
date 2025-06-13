@@ -36,13 +36,14 @@ interface FormValues {
   scheduled_date: string;
   completed_date: string | null;
   frequency: FrequencyType;
-  custom_days: number | '';
+  custom_days: number | '' | null;
   notes: string;
   before_image_file: File | null;
   after_image_file: File | null;
   selected_topics: number[];
   selected_machine_ids: string[];
   property_id: string | null;
+  procedure: string;
 }
 
 // Helper component to handle effects based on Formik's values
@@ -161,6 +162,13 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
         ? Array.from(new Set([machineId, ...machineIdsFromData]))
         : machineIdsFromData;
 
+      const propertyDetails = getPropertyDetails(currentData.property_id);
+      const propertyId = propertyDetails.id || contextSelectedProperty || null;
+
+      const customDays = currentData.custom_days === null || currentData.custom_days === undefined ? '' : currentData.custom_days;
+      const selectedTopics = topicIds || [];
+      const selectedMachineIds = finalMachineIds || [];
+
       return {
         pmtitle: currentData.pmtitle || '',
         scheduled_date: currentData.scheduled_date
@@ -170,13 +178,14 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
           ? formatDateForInput(new Date(currentData.completed_date))
           : null,
         frequency: validateFrequency(currentData.frequency || 'monthly'),
-        custom_days: currentData.custom_days ?? '',
+        custom_days: customDays,
         notes: currentData.notes || '',
         before_image_file: null,
         after_image_file: null,
-        selected_topics: topicIds,
-        selected_machine_ids: finalMachineIds,
-        property_id: getPropertyDetails(currentData.property_id).id ?? contextSelectedProperty ?? null,
+        selected_topics: selectedTopics,
+        selected_machine_ids: selectedMachineIds,
+        property_id: propertyId,
+        procedure: currentData.procedure || '',
       };
     }
 
@@ -191,7 +200,8 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
       after_image_file: null,
       selected_topics: [],
       selected_machine_ids: machineId ? [machineId] : [],
-      property_id: contextSelectedProperty ?? null,
+      property_id: contextSelectedProperty || null,
+      procedure: '',
     };
   }, [actualInitialData, contextSelectedProperty, machineId]);
 
@@ -335,14 +345,15 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
         pmtitle: values.pmtitle.trim() || 'Untitled Maintenance',
         scheduled_date: values.scheduled_date,
         frequency: values.frequency,
-        custom_days: values.frequency === 'custom' && values.custom_days ? Number(values.custom_days) : null,
-        notes: values.notes?.trim() || undefined,
-        property_id: values.property_id || undefined,
-        topic_ids: values.selected_topics && values.selected_topics.length > 0 ? values.selected_topics : undefined,
-        machine_ids: values.selected_machine_ids && values.selected_machine_ids.length > 0 ? values.selected_machine_ids : undefined,
+        custom_days: values.frequency === 'custom' && values.custom_days ? Number(values.custom_days) : undefined,
+        notes: values.notes?.trim() || '',
+        property_id: values.property_id || '',
+        topic_ids: values.selected_topics && values.selected_topics.length > 0 ? values.selected_topics : [],
+        machine_ids: values.selected_machine_ids && values.selected_machine_ids.length > 0 ? values.selected_machine_ids : [],
         completed_date: values.completed_date || undefined,
         before_image: hasBeforeImageFile ? values.before_image_file! : undefined,
         after_image: hasAfterImageFile ? values.after_image_file! : undefined,
+        procedure: values.procedure || undefined,
       };
 
       console.log('[FORM] handleSubmit - Data prepared for service:', JSON.stringify(dataForService, (key, value) => {
@@ -824,6 +835,24 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Procedure */}
+            <div className="mb-6">
+              <label htmlFor="procedure" className="block text-sm font-medium text-gray-700 mb-1">
+                Procedure
+              </label>
+              <Field
+                as="textarea"
+                id="procedure"
+                name="procedure"
+                rows={4}
+                className={`w-full p-2 border rounded-md ${
+                  errors.procedure && touched.procedure ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Enter maintenance procedure steps..."
+              />
+              {errors.procedure && touched.procedure && <p className="mt-1 text-sm text-red-500">{errors.procedure}</p>}
             </div>
 
             {/* Action Buttons */}

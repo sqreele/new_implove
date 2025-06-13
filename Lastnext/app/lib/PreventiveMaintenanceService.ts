@@ -14,21 +14,20 @@ import axios from "axios";
 
 export type CreatePreventiveMaintenanceData = {
   pmtitle: string;
+  property_id: string;
+  machine_ids: string[];
   scheduled_date: string;
-  frequency: FrequencyType;
-  custom_days: number | null;
+  frequency: string;
+  custom_days?: number;
   notes?: string;
-  property_id?: string;
-  topic_ids?: number[];
-  machine_ids?: string[];
-  completed_date?: string;
+  topic_ids: number[];
   before_image?: File;
   after_image?: File;
+  procedure?: string;
+  completed_date?: string;
 };
 
-export interface UpdatePreventiveMaintenanceData extends Partial<CreatePreventiveMaintenanceData> {
-  machine_ids?: string[];
-}
+export type UpdatePreventiveMaintenanceData = Partial<CreatePreventiveMaintenanceData>;
 
 export interface CompletePreventiveMaintenanceData {
   completion_notes?: string;

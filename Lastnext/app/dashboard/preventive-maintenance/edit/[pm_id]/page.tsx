@@ -197,7 +197,7 @@ export default function EditPreventiveMaintenancePage() {
         pmtitle: formState.pmtitle.trim(),
         scheduled_date: formState.scheduled_date,
         frequency: formState.frequency,
-        custom_days: formState.frequency === 'custom' ? formState.custom_days : null,
+        custom_days: formState.frequency === 'custom' ? (formState.custom_days === null ? undefined : formState.custom_days) : undefined,
         notes: formState.notes.trim(),
         completed_date: formState.completed_date || undefined,
         topic_ids: formState.topic_ids,

@@ -48,7 +48,8 @@ export interface MachineDetails {
   machine_id: string;
   name: string;
   status: string;
-  location?: string; // Optional since not always present
+  location?: string;
+  procedure?: string; // Changed to lowercase and made optional
   id?: number;
   property_name?: string;
   maintenance_count?: number;
@@ -76,6 +77,7 @@ export interface PreventiveMaintenance {
   before_image_url?: string | null;
   after_image_url?: string | null;
   created_by?: number;
+  procedure?: string; // Added procedure field
 }
 
 // Request structure for creating/updating maintenance

@@ -44,9 +44,12 @@ const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#FFFFFF',
-    padding: 30,
+    padding: 40,
     fontSize: 10,
-    fontFamily: 'Helvetica'
+    fontFamily: 'Helvetica',
+    width: '595pt',  // A4 width
+    height: '842pt', // A4 height
+    margin: 0
   },
   header: {
     marginBottom: 20,
@@ -57,52 +60,52 @@ const styles = StyleSheet.create({
     paddingBottom: 10
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,  // Reduced from 24 to fit better
     fontWeight: 'bold',
     marginBottom: 5,
     color: '#1f2937'
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 11,  // Adjusted for better fit
     color: '#6b7280',
     marginBottom: 5
   },
   companyInfo: {
-    fontSize: 10,
+    fontSize: 9,  // Adjusted for better fit
     color: '#9ca3af',
     marginTop: 5
   },
   section: {
-    marginBottom: 15
+    marginBottom: 12  // Reduced from 15
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 12,  // Reduced from 14
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 6,  // Reduced from 8
     color: '#374151',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
     borderBottomStyle: 'solid',
-    paddingBottom: 3
+    paddingBottom: 2  // Reduced from 3
   },
   summaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#f9fafb',
-    padding: 15,
-    marginBottom: 20
+    padding: 12,  // Reduced from 15
+    marginBottom: 15  // Reduced from 20
   },
   summaryItem: {
     textAlign: 'center',
     flex: 1
   },
   summaryNumber: {
-    fontSize: 20,
+    fontSize: 16,  // Reduced from 20
     fontWeight: 'bold',
-    marginBottom: 3
+    marginBottom: 2  // Reduced from 3
   },
   summaryLabel: {
-    fontSize: 9,
+    fontSize: 8,  // Reduced from 9
     color: '#6b7280'
   },
   table: {
@@ -110,7 +113,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
     borderStyle: 'solid',
-    marginBottom: 10
+    marginBottom: 8  // Reduced from 10
   },
   tableRow: {
     flexDirection: 'row',
@@ -126,8 +129,8 @@ const styles = StyleSheet.create({
     borderStyle: 'solid',
     borderLeftWidth: 0,
     borderTopWidth: 0,
-    padding: 5,
-    fontSize: 9,
+    padding: 4,  // Reduced from 5
+    fontSize: 8,  // Reduced from 9
     fontWeight: 'bold'
   },
   tableCol: {
@@ -137,44 +140,44 @@ const styles = StyleSheet.create({
     borderStyle: 'solid',
     borderLeftWidth: 0,
     borderTopWidth: 0,
-    padding: 4,
-    fontSize: 8
+    padding: 3,  // Reduced from 4
+    fontSize: 7  // Reduced from 8
   },
   tableCellText: {
-    fontSize: 8,
+    fontSize: 7,  // Reduced from 8
     color: '#374151'
   },
   detailCard: {
     borderWidth: 1,
     borderColor: '#e5e7eb',
     borderStyle: 'solid',
-    padding: 10,
-    marginBottom: 10,
+    padding: 8,  // Reduced from 10
+    marginBottom: 8,  // Reduced from 10
     backgroundColor: '#fafafa'
   },
   detailHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-    paddingBottom: 5,
+    marginBottom: 6,  // Reduced from 8
+    paddingBottom: 4,  // Reduced from 5
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
     borderBottomStyle: 'solid'
   },
   detailTitle: {
-    fontSize: 12,
+    fontSize: 11,  // Reduced from 12
     fontWeight: 'bold',
     color: '#1f2937'
   },
   detailId: {
-    fontSize: 9,
+    fontSize: 8,  // Reduced from 9
     color: '#6b7280'
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    fontSize: 8,
+    paddingHorizontal: 6,  // Reduced from 8
+    paddingVertical: 2,  // Reduced from 3
+    fontSize: 7,  // Reduced from 8
     fontWeight: 'bold',
     textAlign: 'center'
   },
@@ -193,61 +196,72 @@ const styles = StyleSheet.create({
   detailGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 8
+    marginBottom: 6  // Reduced from 8
   },
   detailItem: {
     width: '50%',
-    marginBottom: 4
+    marginBottom: 3  // Reduced from 4
   },
   detailLabel: {
-    fontSize: 8,
+    fontSize: 7,  // Reduced from 8
     fontWeight: 'bold',
     color: '#6b7280',
     marginBottom: 1
   },
   detailValue: {
-    fontSize: 9,
+    fontSize: 8,  // Reduced from 9
     color: '#374151'
   },
-  description: {
-    fontSize: 9,
+  procedure: {
+    fontSize: 8,  // Reduced from 9
     color: '#4b5563',
     lineHeight: 1.4,
-    marginTop: 5
+    marginTop: 4,  // Reduced from 5
+    padding: 4,  // Reduced from 5
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderStyle: 'solid'
+  },
+  description: {
+    fontSize: 8,  // Reduced from 9
+    color: '#4b5563',
+    lineHeight: 1.4,
+    marginTop: 4  // Reduced from 5
   },
   footer: {
     position: 'absolute',
-    bottom: 30,
-    left: 30,
-    right: 30,
+    bottom: 40,  // Adjusted to match page padding
+    left: 40,    // Adjusted to match page padding
+    right: 40,   // Adjusted to match page padding
     textAlign: 'center',
-    fontSize: 8,
+    fontSize: 7,  // Reduced from 8
     color: '#9ca3af',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     borderTopStyle: 'solid',
-    paddingTop: 10
+    paddingTop: 8  // Reduced from 10
   },
   pageNumber: {
     position: 'absolute',
-    fontSize: 8,
-    bottom: 30,
-    right: 30,
+    fontSize: 7,  // Reduced from 8
+    bottom: 40,   // Adjusted to match page padding
+    right: 40,    // Adjusted to match page padding
     color: '#6b7280'
   },
   filterInfo: {
     backgroundColor: '#eff6ff',
-    padding: 10,
-    marginBottom: 15,
+    padding: 8,  // Reduced from 10
+    marginBottom: 12,  // Reduced from 15
     borderWidth: 1,
     borderColor: '#bfdbfe',
     borderStyle: 'solid'
   },
   filterTitle: {
-    fontSize: 10,
+    fontSize: 9,  // Reduced from 10
     fontWeight: 'bold',
     color: '#1e40af',
-    marginBottom: 5
+    marginBottom: 4  // Reduced from 5
   },
   filterItem: {
     fontSize: 8,
@@ -931,6 +945,13 @@ const MaintenancePDFDocument: React.FC<MaintenancePDFDocumentProps> = ({
                  <View style={{ marginTop: 5 }}>
                    <Text style={styles.detailLabel}>Job Description:</Text>
                    <Text style={styles.description}>{(item as any).job_description}</Text>
+                 </View>
+               )}
+
+               {item.procedure && (
+                 <View style={styles.section}>
+                   <Text style={styles.sectionTitle}>Procedure</Text>
+                   <Text style={styles.procedure}>{item.procedure}</Text>
                  </View>
                )}
 

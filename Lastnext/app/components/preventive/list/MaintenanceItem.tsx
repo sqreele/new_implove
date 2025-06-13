@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
-import { Eye, Edit, Trash2, MoreVertical, CheckCircle, AlertCircle, Clock, Calendar, Wrench } from 'lucide-react';
+import { Eye, Edit, Trash2, MoreVertical, CheckCircle, AlertCircle, Clock, Calendar, Wrench, Clipboard } from 'lucide-react';
 
 interface MaintenanceItemProps {
   item: PreventiveMaintenance;
@@ -74,6 +74,12 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
                     <Wrench className="h-3 w-3 mr-1" />
                     <span>{getMachineNames(item.machines)}</span>
                   </div>
+                  {item.procedure && (
+                    <div className="flex items-center">
+                      <Clipboard className="h-3 w-3 mr-1" />
+                      <span className="truncate">{item.procedure}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex items-center justify-between mt-3">
@@ -135,6 +141,12 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
               <div className="text-sm text-gray-900 truncate">
                 {getMachineNames(item.machines)}
               </div>
+              
+              {item.procedure && (
+                <div className="text-sm text-gray-900 truncate">
+                  {item.procedure}
+                </div>
+              )}
               
               <div className="flex items-center space-x-2">
                 <Link
