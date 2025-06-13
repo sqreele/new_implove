@@ -244,16 +244,38 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
   }, []);
 
   useEffect(() => {
-    fetchAvailableTopics();
+    let mounted = true;
+    const loadData = async () => {
+      try {
+        await fetchAvailableTopics();
+        if (mounted) {
+          setLoadingTopics(false);
+        }
+      } catch (err) {
+        if (mounted) {
+          console.error('Error loading topics:', err);
+          setError('Failed to load topics. Please try again.');
+          setLoadingTopics(false);
+        }
+      }
+    };
+
+    loadData();
+    return () => {
+      mounted = false;
+    };
   }, [fetchAvailableTopics]);
 
   useEffect(() => {
+    let mounted = true;
     if (pmId && !initialDataProp) {
       setIsLoading(true);
       clearError();
       preventiveMaintenanceService
         .getPreventiveMaintenanceById(pmId)
         .then((response) => {
+          if (!mounted) return;
+          
           if (response.success && response.data) {
             console.log('[PreventiveMaintenanceForm] Fetched maintenance data:', response.data);
             setFetchedInitialData(response.data);
@@ -271,12 +293,15 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
           }
         })
         .catch((err) => {
+          if (!mounted) return;
           console.error('Error fetching maintenance data:', err);
           setError(err.message || 'Failed to fetch maintenance data');
           setFetchedInitialData(null);
         })
         .finally(() => {
-          setIsLoading(false);
+          if (mounted) {
+            setIsLoading(false);
+          }
         });
     } else if (initialDataProp) {
       console.log('[PreventiveMaintenanceForm] Using initialDataProp:', initialDataProp);
@@ -290,6 +315,10 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
         console.warn('[PreventiveMaintenanceForm] Missing machine_id/machines in initialDataProp');
       }
     }
+
+    return () => {
+      mounted = false;
+    };
   }, [pmId, initialDataProp]);
 
   const handleFileSelection = (
@@ -328,6 +357,7 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
 
   const handleSubmit = async (values: FormValues, formikHelpers: FormikHelpers<FormValues>) => {
     const { setSubmitting, resetForm } = formikHelpers;
+    let isMounted = true;
 
     clearError();
     setSubmitError(null);
@@ -375,6 +405,8 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
         response = await preventiveMaintenanceService.createPreventiveMaintenance(dataForService);
       }
 
+      if (!isMounted) return;
+
       console.log('[FORM] handleSubmit - Service response:', response);
 
       if (response.success && response.data) {
@@ -396,6 +428,8 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
         throw new Error(errMsg);
       }
     } catch (error: any) {
+      if (!isMounted) return;
+      
       console.error('[FORM] handleSubmit - Error submitting form:', error);
       let errorMessage = 'An unexpected error occurred.';
       if (error.response?.data) {
@@ -415,9 +449,11 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
       setSubmitError(errorMessage);
       toast.error(errorMessage);
     } finally {
-      setSubmitting(false);
-      setIsLoading(false);
-      setIsImageUploading(false);
+      if (isMounted) {
+        setSubmitting(false);
+        setIsLoading(false);
+        setIsImageUploading(false);
+      }
     }
   };
 

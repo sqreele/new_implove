@@ -1,6 +1,6 @@
 // app/components/pdf/MaintenancePDFDocument.tsx
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Document,
   Page,
@@ -418,6 +418,19 @@ const styles = StyleSheet.create({
     borderStyle: 'solid',
     marginBottom: 4,
     backgroundColor: '#ffffff'
+  },
+  errorContainer: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#fef2f2'
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#dc2626',
+    textAlign: 'center',
+    marginBottom: 20
   }
 });
 
@@ -434,6 +447,17 @@ interface MaintenancePDFDocumentProps {
   includeImages?: boolean;
   title?: string;
 }
+
+// Add prop validation
+const validateProps = (props: MaintenancePDFDocumentProps) => {
+  if (!props.data || !Array.isArray(props.data)) {
+    throw new Error('MaintenancePDFDocument: data prop must be an array');
+  }
+  if (props.appliedFilters && typeof props.appliedFilters !== 'object') {
+    throw new Error('MaintenancePDFDocument: appliedFilters must be an object');
+  }
+  return true;
+};
 
 // Helper functions
 const getTaskStatus = (item: PreventiveMaintenance) => {
@@ -550,36 +574,51 @@ const hasImages = (item: PreventiveMaintenanceWithImages): boolean => {
   return getBeforeImages(item).length > 0 || getAfterImages(item).length > 0;
 };
 
-// Image rendering components
+// Add error boundary for image loading
+const SafeImage: React.FC<{ src: string; style?: any }> = ({ src, style }) => {
+  const [error, setError] = useState(false);
+  
+  if (error) {
+    return (
+      <View style={[style, { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: '#6b7280', fontSize: 8 }}>Image failed to load</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      style={style}
+      cache={false}
+    />
+  );
+};
+
+// Update ImageDisplay component
 const ImageDisplay: React.FC<{ 
   image: MaintenanceImage; 
   style?: any; 
   showCaption?: boolean; 
   showTimestamp?: boolean; 
 }> = ({ image, style = styles.maintenanceImage, showCaption = true, showTimestamp = false }) => {
-  try {
-    return (
-      <View>
-        <Image src={image.url} style={style} />
-        {showCaption && image.caption && (
-          <Text style={styles.imageCaption}>{image.caption}</Text>
-        )}
-        {showTimestamp && image.timestamp && (
-          <Text style={styles.imageTimestamp}>
-            {formatDateTime(image.timestamp)}
-          </Text>
-        )}
-      </View>
-    );
-  } catch (error) {
-    return (
-      <View style={[style, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#fef2f2' }]}>
-        <Text style={styles.imageErrorText}>
-          Unable to load image
-        </Text>
-      </View>
-    );
+  if (!image?.url) {
+    return null;
   }
+
+  return (
+    <View style={[styles.imageContainer, style]}>
+      <SafeImage src={image.url} style={styles.maintenanceImage} />
+      {showCaption && image.caption && (
+        <Text style={styles.imageCaption}>{image.caption}</Text>
+      )}
+      {showTimestamp && image.timestamp && (
+        <Text style={styles.imageTimestamp}>
+          {formatDateTime(image.timestamp)}
+        </Text>
+      )}
+    </View>
+  );
 };
 
 const MultipleImagesDisplay: React.FC<{ 
@@ -704,296 +743,316 @@ const ImageSummaryDisplay: React.FC<{ item: PreventiveMaintenanceWithImages }> =
 };
 
 const MaintenancePDFDocument: React.FC<MaintenancePDFDocumentProps> = ({
- data,
- appliedFilters,
- includeDetails = true,
- includeImages = false,
- title = 'Preventive Maintenance Report'
+  data,
+  appliedFilters,
+  includeDetails = true,
+  includeImages = false,
+  title = 'Preventive Maintenance Report'
 }) => {
- // Calculate statistics
- const totalTasks = data.length;
- const completedTasks = data.filter(item => getTaskStatus(item) === 'completed').length;
- const pendingTasks = data.filter(item => getTaskStatus(item) === 'pending').length;
- const overdueTasks = data.filter(item => getTaskStatus(item) === 'overdue').length;
- const tasksWithImages = includeImages ? data.filter(item => hasImages(item)).length : 0;
+  // Validate props
+  useEffect(() => {
+    validateProps({ data, appliedFilters, includeDetails, includeImages, title });
+  }, [data, appliedFilters, includeDetails, includeImages, title]);
 
- // Check if filters are applied
- const hasFilters = appliedFilters && Object.values(appliedFilters).some(filter => filter !== '');
+  // Add error state
+  const [error, setError] = useState<string | null>(null);
 
- return (
-   <Document>
-     <Page size="A4" style={styles.page}>
-       {/* Header */}
-       <View style={styles.header}>
-         <Text style={styles.title}>{title}</Text>
-         <Text style={styles.subtitle}>
-           Generated on {new Date().toLocaleDateString('en-US', {
-             year: 'numeric',
-             month: 'long',
-             day: 'numeric',
-             hour: '2-digit',
-             minute: '2-digit'
-           })}
-         </Text>
-         <Text style={styles.companyInfo}>Facility Management System</Text>
-       </View>
+  if (error) {
+    return (
+      <Document>
+        <Page size="A4" style={styles.page}>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        </Page>
+      </Document>
+    );
+  }
 
-       {/* Applied Filters */}
-       {hasFilters && (
-         <View style={styles.filterInfo}>
-           <Text style={styles.filterTitle}>Applied Filters:</Text>
-           {appliedFilters!.status && (
-             <Text style={styles.filterItem}>Status: {appliedFilters!.status}</Text>
-           )}
-           {appliedFilters!.frequency && (
-             <Text style={styles.filterItem}>Frequency: {appliedFilters!.frequency}</Text>
-           )}
-           {appliedFilters!.search && (
-             <Text style={styles.filterItem}>Search: "{appliedFilters!.search}"</Text>
-           )}
-           {appliedFilters!.startDate && (
-             <Text style={styles.filterItem}>Start Date: {appliedFilters!.startDate}</Text>
-           )}
-           {appliedFilters!.endDate && (
-             <Text style={styles.filterItem}>End Date: {appliedFilters!.endDate}</Text>
-           )}
-         </View>
-       )}
+  // Calculate statistics
+  const totalTasks = data.length;
+  const completedTasks = data.filter(item => getTaskStatus(item) === 'completed').length;
+  const pendingTasks = data.filter(item => getTaskStatus(item) === 'pending').length;
+  const overdueTasks = data.filter(item => getTaskStatus(item) === 'overdue').length;
+  const tasksWithImages = includeImages ? data.filter(item => hasImages(item)).length : 0;
 
-       {/* Summary Statistics */}
-       <View style={styles.section}>
-         <Text style={styles.sectionTitle}>Summary Statistics</Text>
-         <View style={styles.summaryContainer}>
-           <View style={styles.summaryItem}>
-             <Text style={[styles.summaryNumber, { color: '#2563eb' }]}>{totalTasks}</Text>
-             <Text style={styles.summaryLabel}>Total Tasks</Text>
-           </View>
-           <View style={styles.summaryItem}>
-             <Text style={[styles.summaryNumber, { color: '#16a34a' }]}>{completedTasks}</Text>
-             <Text style={styles.summaryLabel}>Completed</Text>
-           </View>
-           <View style={styles.summaryItem}>
-             <Text style={[styles.summaryNumber, { color: '#ca8a04' }]}>{pendingTasks}</Text>
-             <Text style={styles.summaryLabel}>Pending</Text>
-           </View>
-           <View style={styles.summaryItem}>
-             <Text style={[styles.summaryNumber, { color: '#dc2626' }]}>{overdueTasks}</Text>
-             <Text style={styles.summaryLabel}>Overdue</Text>
-           </View>
-           {includeImages && (
-             <View style={styles.summaryItem}>
-               <Text style={[styles.summaryNumber, { color: '#7c3aed' }]}>{tasksWithImages}</Text>
-               <Text style={styles.summaryLabel}>With Images</Text>
-             </View>
-           )}
-         </View>
-       </View>
+  // Check if filters are applied
+  const hasFilters = appliedFilters && Object.values(appliedFilters).some(filter => filter !== '');
 
-       {/* Maintenance Tasks Table */}
-       {data.length > 0 && (
-         <View style={styles.section}>
-           <Text style={styles.sectionTitle}>Maintenance Tasks</Text>
-           <View style={styles.table}>
-             {/* Table Header */}
-             <View style={[styles.tableRow, styles.tableHeader]}>
-               <View style={styles.tableColHeader}>
-                 <Text style={styles.tableCellText}>Task ID</Text>
-               </View>
-               <View style={styles.tableColHeader}>
-                 <Text style={styles.tableCellText}>Title</Text>
-               </View>
-               <View style={styles.tableColHeader}>
-                 <Text style={styles.tableCellText}>Date</Text>
-               </View>
-               <View style={styles.tableColHeader}>
-                 <Text style={styles.tableCellText}>Status</Text>
-               </View>
-               <View style={styles.tableColHeader}>
-                 <Text style={styles.tableCellText}>Frequency</Text>
-               </View>
-               <View style={styles.tableColHeader}>
-                 <Text style={styles.tableCellText}>Topics</Text>
-               </View>
-               <View style={styles.tableColHeader}>
-                 <Text style={styles.tableCellText}>
-                   {includeImages ? 'Images' : 'Location'}
-                 </Text>
-               </View>
-             </View>
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>
+            Generated on {new Date().toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </Text>
+          <Text style={styles.companyInfo}>Facility Management System</Text>
+        </View>
 
-             {/* Table Rows */}
-             {data.map((item, index) => (
-               <View style={styles.tableRow} key={item.id || index}>
-                 <View style={styles.tableCol}>
-                   <Text style={styles.tableCellText}>{item.pm_id}</Text>
-                 </View>
-                 <View style={styles.tableCol}>
-                   <Text style={styles.tableCellText}>
-                     {item.pmtitle || 'No title'}
-                   </Text>
-                 </View>
-                 <View style={styles.tableCol}>
-                   <Text style={styles.tableCellText}>
-                     {formatDate(item.scheduled_date)}
-                   </Text>
-                 </View>
-                 <View style={styles.tableCol}>
-                   <Text style={[styles.tableCellText, styles.capitalizeText]}>
-                     {getTaskStatus(item)}
-                   </Text>
-                 </View>
-                 <View style={styles.tableCol}>
-                   <Text style={[styles.tableCellText, styles.capitalizeText]}>
-                     {item.frequency}
-                   </Text>
-                 </View>
-                 <View style={styles.tableCol}>
-                   <Text style={styles.tableCellText}>
-                     {getTopicsString(item.topics)}
-                   </Text>
-                 </View>
-                 <View style={styles.tableCol}>
-                   {includeImages ? (
-                     <ImageSummaryDisplay item={item} />
-                   ) : (
-                     <Text style={styles.tableCellText}>
-                       {getLocationString(item)}
-                     </Text>
-                   )}
-                 </View>
-               </View>
-             ))}
-           </View>
-         </View>
-       )}
+        {/* Applied Filters */}
+        {hasFilters && (
+          <View style={styles.filterInfo}>
+            <Text style={styles.filterTitle}>Applied Filters:</Text>
+            {appliedFilters!.status && (
+              <Text style={styles.filterItem}>Status: {appliedFilters!.status}</Text>
+            )}
+            {appliedFilters!.frequency && (
+              <Text style={styles.filterItem}>Frequency: {appliedFilters!.frequency}</Text>
+            )}
+            {appliedFilters!.search && (
+              <Text style={styles.filterItem}>Search: "{appliedFilters!.search}"</Text>
+            )}
+            {appliedFilters!.startDate && (
+              <Text style={styles.filterItem}>Start Date: {appliedFilters!.startDate}</Text>
+            )}
+            {appliedFilters!.endDate && (
+              <Text style={styles.filterItem}>End Date: {appliedFilters!.endDate}</Text>
+            )}
+          </View>
+        )}
 
-       {/* Page Number */}
-       <Text 
-         style={styles.pageNumber} 
-         render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} 
-         fixed 
-       />
+        {/* Summary Statistics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Summary Statistics</Text>
+          <View style={styles.summaryContainer}>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryNumber, { color: '#2563eb' }]}>{totalTasks}</Text>
+              <Text style={styles.summaryLabel}>Total Tasks</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryNumber, { color: '#16a34a' }]}>{completedTasks}</Text>
+              <Text style={styles.summaryLabel}>Completed</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryNumber, { color: '#ca8a04' }]}>{pendingTasks}</Text>
+              <Text style={styles.summaryLabel}>Pending</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryNumber, { color: '#dc2626' }]}>{overdueTasks}</Text>
+              <Text style={styles.summaryLabel}>Overdue</Text>
+            </View>
+            {includeImages && (
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryNumber, { color: '#7c3aed' }]}>{tasksWithImages}</Text>
+                <Text style={styles.summaryLabel}>With Images</Text>
+              </View>
+            )}
+          </View>
+        </View>
 
-       {/* Footer */}
-       <View style={styles.footer} fixed>
-         <Text>This report was automatically generated by the Facility Management System</Text>
-         <Text>© 2025 - Confidential and Proprietary Information</Text>
-       </View>
-     </Page>
+        {/* Maintenance Tasks Table */}
+        {data.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Maintenance Tasks</Text>
+            <View style={styles.table}>
+              {/* Table Header */}
+              <View style={[styles.tableRow, styles.tableHeader]}>
+                <View style={styles.tableColHeader}>
+                  <Text style={styles.tableCellText}>Task ID</Text>
+                </View>
+                <View style={styles.tableColHeader}>
+                  <Text style={styles.tableCellText}>Title</Text>
+                </View>
+                <View style={styles.tableColHeader}>
+                  <Text style={styles.tableCellText}>Date</Text>
+                </View>
+                <View style={styles.tableColHeader}>
+                  <Text style={styles.tableCellText}>Status</Text>
+                </View>
+                <View style={styles.tableColHeader}>
+                  <Text style={styles.tableCellText}>Frequency</Text>
+                </View>
+                <View style={styles.tableColHeader}>
+                  <Text style={styles.tableCellText}>Topics</Text>
+                </View>
+                <View style={styles.tableColHeader}>
+                  <Text style={styles.tableCellText}>
+                    {includeImages ? 'Images' : 'Location'}
+                  </Text>
+                </View>
+              </View>
 
-     {/* Detailed Task Descriptions - New Page */}
-     {includeDetails && data.length > 0 && (
-       <Page size="A4" style={styles.page}>
-         <View style={styles.header}>
-           <Text style={styles.title}>Detailed Task Information</Text>
-         </View>
+              {/* Table Rows */}
+              {data.map((item, index) => (
+                <View style={styles.tableRow} key={item.id || index}>
+                  <View style={styles.tableCol}>
+                    <Text style={styles.tableCellText}>{item.pm_id}</Text>
+                  </View>
+                  <View style={styles.tableCol}>
+                    <Text style={styles.tableCellText}>
+                      {item.pmtitle || 'No title'}
+                    </Text>
+                  </View>
+                  <View style={styles.tableCol}>
+                    <Text style={styles.tableCellText}>
+                      {formatDate(item.scheduled_date)}
+                    </Text>
+                  </View>
+                  <View style={styles.tableCol}>
+                    <Text style={[styles.tableCellText, styles.capitalizeText]}>
+                      {getTaskStatus(item)}
+                    </Text>
+                  </View>
+                  <View style={styles.tableCol}>
+                    <Text style={[styles.tableCellText, styles.capitalizeText]}>
+                      {item.frequency}
+                    </Text>
+                  </View>
+                  <View style={styles.tableCol}>
+                    <Text style={styles.tableCellText}>
+                      {getTopicsString(item.topics)}
+                    </Text>
+                  </View>
+                  <View style={styles.tableCol}>
+                    {includeImages ? (
+                      <ImageSummaryDisplay item={item} />
+                    ) : (
+                      <Text style={styles.tableCellText}>
+                        {getLocationString(item)}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
-         {data.map((item, index) => {
-           const status = getTaskStatus(item);
-           return (
-             <View style={styles.detailCard} key={item.id || index}>
-               <View style={styles.detailHeader}>
-                 <View>
-                   <Text style={styles.detailTitle}>
-                     {item.pmtitle || 'No title'}
-                   </Text>
-                   <Text style={styles.detailId}>ID: {item.pm_id}</Text>
-                 </View>
-                 <View style={getStatusStyle(status)}>
-                   <Text style={styles.uppercaseText}>{status}</Text>
-                 </View>
-               </View>
+        {/* Page Number */}
+        <Text 
+          style={styles.pageNumber} 
+          render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} 
+          fixed 
+        />
 
-               <View style={styles.detailGrid}>
-                 <View style={styles.detailItem}>
-                   <Text style={styles.detailLabel}>Scheduled Date:</Text>
-                   <Text style={styles.detailValue}>{formatDate(item.scheduled_date)}</Text>
-                 </View>
-                 <View style={styles.detailItem}>
-                   <Text style={styles.detailLabel}>Frequency:</Text>
-                   <Text style={[styles.detailValue, styles.capitalizeText]}>
-                     {item.frequency}
-                   </Text>
-                 </View>
-                 <View style={styles.detailItem}>
-                   <Text style={styles.detailLabel}>Topics:</Text>
-                   <Text style={styles.detailValue}>{getTopicsString(item.topics)}</Text>
-                 </View>
-                 <View style={styles.detailItem}>
-                   <Text style={styles.detailLabel}>Next Due:</Text>
-                   <Text style={styles.detailValue}>
-                     {item.next_due_date ? formatDate(item.next_due_date) : 'Not specified'}
-                   </Text>
-                 </View>
-               </View>
+        {/* Footer */}
+        <View style={styles.footer} fixed>
+          <Text>This report was automatically generated by the Facility Management System</Text>
+          <Text>© 2025 - Confidential and Proprietary Information</Text>
+        </View>
+      </Page>
 
-               {item.machines && item.machines.length > 0 && (
-                 <View style={{ marginBottom: 5 }}>
-                   <Text style={styles.detailLabel}>Machines:</Text>
-                   <Text style={styles.detailValue}>{getMachinesString(item.machines)}</Text>
-                 </View>
-               )}
+      {/* Detailed Task Descriptions - New Page */}
+      {includeDetails && data.length > 0 && (
+        <Page size="A4" style={styles.page}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Detailed Task Information</Text>
+          </View>
 
-               {item.property_id && (
-                 <View style={{ marginBottom: 5 }}>
-                   <Text style={styles.detailLabel}>Property ID:</Text>
-                   <Text style={styles.detailValue}>{item.property_id}</Text>
-                 </View>
-               )}
+          {data.map((item, index) => {
+            const status = getTaskStatus(item);
+            return (
+              <View style={styles.detailCard} key={item.id || index}>
+                <View style={styles.detailHeader}>
+                  <View>
+                    <Text style={styles.detailTitle}>
+                      {item.pmtitle || 'No title'}
+                    </Text>
+                    <Text style={styles.detailId}>ID: {item.pm_id}</Text>
+                  </View>
+                  <View style={getStatusStyle(status)}>
+                    <Text style={styles.uppercaseText}>{status}</Text>
+                  </View>
+                </View>
 
-               {(item as any).job_description && (
-                 <View style={{ marginTop: 5 }}>
-                   <Text style={styles.detailLabel}>Job Description:</Text>
-                   <Text style={styles.description}>{(item as any).job_description}</Text>
-                 </View>
-               )}
+                <View style={styles.detailGrid}>
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Scheduled Date:</Text>
+                    <Text style={styles.detailValue}>{formatDate(item.scheduled_date)}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Frequency:</Text>
+                    <Text style={[styles.detailValue, styles.capitalizeText]}>
+                      {item.frequency}
+                    </Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Topics:</Text>
+                    <Text style={styles.detailValue}>{getTopicsString(item.topics)}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Next Due:</Text>
+                    <Text style={styles.detailValue}>
+                      {item.next_due_date ? formatDate(item.next_due_date) : 'Not specified'}
+                    </Text>
+                  </View>
+                </View>
 
-               {item.procedure && (
-                 <View style={styles.section}>
-                   <Text style={styles.sectionTitle}>Procedure</Text>
-                   <Text style={styles.procedure}>{item.procedure}</Text>
-                 </View>
-               )}
+                {item.machines && item.machines.length > 0 && (
+                  <View style={{ marginBottom: 5 }}>
+                    <Text style={styles.detailLabel}>Machines:</Text>
+                    <Text style={styles.detailValue}>{getMachinesString(item.machines)}</Text>
+                  </View>
+                )}
 
-               {item.notes && (
-                 <View style={{ marginTop: 5 }}>
-                   <Text style={styles.detailLabel}>Notes:</Text>
-                   <Text style={styles.description}>{item.notes}</Text>
-                 </View>
-               )}
+                {item.property_id && (
+                  <View style={{ marginBottom: 5 }}>
+                    <Text style={styles.detailLabel}>Property ID:</Text>
+                    <Text style={styles.detailValue}>{item.property_id}</Text>
+                  </View>
+                )}
 
-               {/* Before/After Images Section */}
-               {includeImages && hasImages(item) && (
-                 <BeforeAfterImages item={item} />
-               )}
+                {(item as any).job_description && (
+                  <View style={{ marginTop: 5 }}>
+                    <Text style={styles.detailLabel}>Job Description:</Text>
+                    <Text style={styles.description}>{(item as any).job_description}</Text>
+                  </View>
+                )}
 
-               {item.completed_date && (
-                 <View style={{ marginTop: 8, paddingTop: 5, borderTopWidth: 1, borderTopColor: '#e5e7eb', borderTopStyle: 'solid' }}>
-                   <Text style={[styles.detailValue, { color: '#16a34a', fontWeight: 'bold' }]}>
-                     Completed: {formatDate(item.completed_date)}
-                   </Text>
-                 </View>
-               )}
-             </View>
-           );
-         })}
+                {item.procedure && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Procedure</Text>
+                    <Text style={styles.procedure}>{item.procedure}</Text>
+                  </View>
+                )}
 
-         {/* Page Number */}
-         <Text 
-           style={styles.pageNumber} 
-           render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} 
-           fixed 
-         />
+                {item.notes && (
+                  <View style={{ marginTop: 5 }}>
+                    <Text style={styles.detailLabel}>Notes:</Text>
+                    <Text style={styles.description}>{item.notes}</Text>
+                  </View>
+                )}
 
-         {/* Footer */}
-         <View style={styles.footer} fixed>
-           <Text>This report was automatically generated by the Facility Management System</Text>
-           <Text>© 2025 - Confidential and Proprietary Information</Text>
-         </View>
-       </Page>
-     )}
-   </Document>
- );
+                {/* Before/After Images Section */}
+                {includeImages && hasImages(item) && (
+                  <BeforeAfterImages item={item} />
+                )}
+
+                {item.completed_date && (
+                  <View style={{ marginTop: 8, paddingTop: 5, borderTopWidth: 1, borderTopColor: '#e5e7eb', borderTopStyle: 'solid' }}>
+                    <Text style={[styles.detailValue, { color: '#16a34a', fontWeight: 'bold' }]}>
+                      Completed: {formatDate(item.completed_date)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+
+          {/* Page Number */}
+          <Text 
+            style={styles.pageNumber} 
+            render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} 
+            fixed 
+          />
+
+          {/* Footer */}
+          <View style={styles.footer} fixed>
+            <Text>This report was automatically generated by the Facility Management System</Text>
+            <Text>© 2025 - Confidential and Proprietary Information</Text>
+          </View>
+        </Page>
+      )}
+    </Document>
+  );
 };
 
 export default MaintenancePDFDocument;
