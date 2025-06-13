@@ -7,7 +7,7 @@ import { useFilters } from '@/app/lib/FilterContext';
 import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
 
 // Import types
-import { FilterState, MachineOption, Stats } from '@/app/lib/types/filterTypes';
+import { FilterState, MachineOption, Stats } from '@/app/lib/hooks/filterTypes';
 
 // Import components
 import MobileHeader from '@/app/components/preventive/list/MobileHeader';
@@ -29,6 +29,9 @@ import {
   getStatusInfo,
   getMachineNames
 } from '@/app/lib/utils/maintenanceUtils';
+
+// Define the sort field type
+type SortField = 'date' | 'status' | 'frequency' | 'machine';
 
 export default function PreventiveMaintenanceListPage() {
   const router = useRouter();
@@ -53,7 +56,7 @@ export default function PreventiveMaintenanceListPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'date' | 'status' | 'frequency' | 'machine'>('date');
+  const [sortBy, setSortBy] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Enhanced machine options with better display
@@ -143,13 +146,28 @@ export default function PreventiveMaintenanceListPage() {
     return machine ? machine.name : machineId;
   }, [machines]);
 
-  // Enhanced filter handlers
-  const handleFilterChange = useCallback((key: keyof FilterState, value: string | number) => {
-    updateFilter(key, value);
-    
-    // Reset to first page when filtering
-    if (key !== 'page' && key !== 'pageSize') {
-      updateFilter('page', 1);
+  // Enhanced filter handlers - create a wrapper function
+  const handleFilterChangeWrapper = useCallback((key: string, value: string | number) => {
+    // Map string keys to FilterState keys
+    const validKeys: Record<string, keyof FilterState> = {
+      'status': 'status',
+      'frequency': 'frequency',
+      'search': 'search',
+      'startDate': 'startDate',
+      'endDate': 'endDate',
+      'page': 'page',
+      'pageSize': 'pageSize',
+      'machine': 'machine'
+    };
+
+    const filterKey = validKeys[key];
+    if (filterKey) {
+      updateFilter(filterKey, value);
+      
+      // Reset to first page when filtering
+      if (filterKey !== 'page' && filterKey !== 'pageSize') {
+        updateFilter('page', 1);
+      }
     }
   }, [updateFilter]);
 
@@ -158,8 +176,8 @@ export default function PreventiveMaintenanceListPage() {
     setSelectedItems([]);
   }, [clearFilters]);
 
-  // Enhanced sort handler
-  const handleSort = useCallback((field: typeof sortBy) => {
+  // Enhanced sort handler with correct typing
+  const handleSort = useCallback((field: SortField) => {
     if (sortBy === field) {
       setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -167,6 +185,15 @@ export default function PreventiveMaintenanceListPage() {
       setSortOrder('asc');
     }
   }, [sortBy]);
+
+  // Create a wrapper that accepts string and converts to SortField
+  const handleSortWrapper = useCallback((field: string) => {
+    // Validate that the field is a valid SortField
+    const validSortFields: SortField[] = ['date', 'status', 'frequency', 'machine'];
+    if (validSortFields.includes(field as SortField)) {
+      handleSort(field as SortField);
+    }
+  }, [handleSort]);
 
   // Selection handlers
   const handleSelectAll = useCallback((checked: boolean) => {
@@ -280,11 +307,11 @@ export default function PreventiveMaintenanceListPage() {
             totalCount={totalCount}
             sortBy={sortBy}
             sortOrder={sortOrder}
-            onFilterChange={handleFilterChange}
+            onFilterChange={handleFilterChangeWrapper}
             onClearFilters={clearAllFilters}
             onSortChange={(newSortBy, newSortOrder) => {
-              setSortBy(newSortBy as typeof sortBy);
-              setSortOrder(newSortOrder as typeof sortOrder);
+              setSortBy(newSortBy as SortField);
+              setSortOrder(newSortOrder as 'asc' | 'desc');
             }}
             getMachineNameById={getMachineNameById}
             getFrequencyText={getFrequencyText}
@@ -316,7 +343,7 @@ export default function PreventiveMaintenanceListPage() {
             selectedItems={selectedItems}
             onSelectAll={handleSelectAll}
             onSelectItem={handleSelectItem}
-            onSort={handleSort}
+            onSort={handleSortWrapper}
             onDelete={setDeleteConfirm}
             sortBy={sortBy}
             sortOrder={sortOrder}
@@ -335,8 +362,8 @@ export default function PreventiveMaintenanceListPage() {
             totalPages={totalPages}
             pageSize={currentFilters.pageSize}
             totalCount={totalCount}
-            onPageChange={(page) => handleFilterChange('page', page)}
-            onPageSizeChange={(size) => handleFilterChange('pageSize', size)}
+            onPageChange={(page) => handleFilterChangeWrapper('page', page)}
+            onPageSizeChange={(size) => handleFilterChangeWrapper('pageSize', size)}
           />
         )}
       </div>
