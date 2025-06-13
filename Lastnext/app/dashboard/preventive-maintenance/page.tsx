@@ -104,7 +104,11 @@ export default function PreventiveMaintenanceListPage() {
         page_size: currentFilters.pageSize || 10
       };
 
+      console.log('Filter sync - currentFilters:', currentFilters);
+      console.log('Filter sync - newParams:', newParams);
+
       if (JSON.stringify(newParams) !== JSON.stringify(filterParams)) {
+        console.log('Updating filter params...');
         setFilterParams(newParams);
       }
     }, 300);
@@ -150,6 +154,8 @@ export default function PreventiveMaintenanceListPage() {
 
   // Enhanced filter handlers - create a wrapper function
   const handleFilterChangeWrapper = useCallback((key: string, value: string | number) => {
+    console.log('Filter change:', key, value);
+    
     // Map string keys to FilterState keys
     const validKeys: Record<string, keyof FilterState> = {
       'status': 'status',
@@ -174,6 +180,7 @@ export default function PreventiveMaintenanceListPage() {
   }, [updateFilter]);
 
   const clearAllFilters = useCallback(() => {
+    console.log('Clearing all filters');
     clearFilters();
     setSelectedItems([]);
   }, [clearFilters]);
@@ -196,6 +203,13 @@ export default function PreventiveMaintenanceListPage() {
       handleSort(field as SortField);
     }
   }, [handleSort]);
+
+  // Fixed sort change handler for FilterPanel
+  const handleSortChangeAction = useCallback((field: SortField, order: 'asc' | 'desc') => {
+    console.log('Sort change:', field, order);
+    setSortBy(field);
+    setSortOrder(order);
+  }, []);
 
   // Selection handlers
   const handleSelectAll = useCallback((checked: boolean) => {
@@ -240,6 +254,7 @@ export default function PreventiveMaintenanceListPage() {
 
   // Refresh handler
   const handleRefresh = useCallback(async () => {
+    console.log('Refreshing data...');
     await fetchMaintenanceItems();
   }, [fetchMaintenanceItems]);
 
@@ -249,7 +264,7 @@ export default function PreventiveMaintenanceListPage() {
   }, [debugMachineFilter]);
 
   // Pagination
-  const totalPages = Math.ceil(totalCount / currentFilters.pageSize);
+  const totalPages = Math.ceil(totalCount / (currentFilters.pageSize || 10));
 
   // Active filters count
   const activeFiltersCount = useMemo(() => {
@@ -311,10 +326,7 @@ export default function PreventiveMaintenanceListPage() {
             sortOrder={sortOrder}
             onFilterChangeAction={handleFilterChangeWrapper}
             onClearFiltersAction={clearAllFilters}
-            onSortChangeAction={(newSortBy: string, newSortOrder: string) => {
-              setSortBy(newSortBy as SortField);
-              setSortOrder(newSortOrder as 'asc' | 'desc');
-            }}
+            onSortChangeAction={handleSortChangeAction}
           />
         )}
 
@@ -358,16 +370,17 @@ export default function PreventiveMaintenanceListPage() {
         {/* Pagination */}
         {totalPages > 1 && (
           <Pagination
-            currentPage={currentFilters.page}
+            currentPage={currentFilters.page || 1}
             totalPages={totalPages}
-            pageSize={currentFilters.pageSize}
+            pageSize={currentFilters.pageSize || 10}
             totalCount={totalCount}
             onPageChange={(page) => handleFilterChangeWrapper('page', page)}
             onPageSizeChange={(size) => handleFilterChangeWrapper('pageSize', size)}
           />
         )}
 
-        <div className="flex flex-col sm:flex-row gap-3">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3 p-4">
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center px-4 py-2 border rounded-lg transition-colors ${
