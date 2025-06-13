@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { AlertCircle } from 'lucide-react';
 
 interface DeleteModalProps {
@@ -7,7 +8,7 @@ interface DeleteModalProps {
   onCancel: () => void;
 }
 
-export default function DeleteModal({ onConfirm, onCancel }: DeleteModalProps) {
+const DeleteModal: React.FC<DeleteModalProps> = ({ onConfirm, onCancel }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg p-6 max-w-md w-full">
@@ -46,4 +47,6 @@ export default function DeleteModal({ onConfirm, onCancel }: DeleteModalProps) {
       </div>
     </div>
   );
-}
+};
+
+export default DeleteModal;

@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { Trash2 } from 'lucide-react';
 
 interface BulkActionsProps {
@@ -8,7 +9,7 @@ interface BulkActionsProps {
   onClear: () => void;
 }
 
-export default function BulkActions({ selectedCount, onBulkDelete, onClear }: BulkActionsProps) {
+const BulkActions: React.FC<BulkActionsProps> = ({ selectedCount, onBulkDelete, onClear }) => {
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mx-4 md:mx-0 mb-4 md:mb-6">
       <div className="flex items-center justify-between">
@@ -33,4 +34,6 @@ export default function BulkActions({ selectedCount, onBulkDelete, onClear }: Bu
       </div>
     </div>
   );
-}
+};
+
+export default BulkActions;

@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { AlertCircle, X } from 'lucide-react';
 
 interface ErrorDisplayProps {
@@ -7,7 +8,7 @@ interface ErrorDisplayProps {
   onClear: () => void;
 }
 
-export default function ErrorDisplay({ error, onClear }: ErrorDisplayProps) {
+const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onClear }) => {
   return (
     <div className="bg-red-50 border border-red-200 rounded-lg p-4 mx-4 md:mx-0 mb-4 md:mb-6">
       <div className="flex items-start">
@@ -24,8 +25,6 @@ export default function ErrorDisplay({ error, onClear }: ErrorDisplayProps) {
       </div>
     </div>
   );
-<<<<<<< HEAD
-}
-=======
-}
->>>>>>> dbc6bb4 (addfixmaintain)
+};
+
+export default ErrorDisplay;
