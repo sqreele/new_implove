@@ -380,38 +380,7 @@ export default function PreventiveMaintenanceListPage() {
         )}
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 p-4">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center px-4 py-2 border rounded-lg transition-colors ${
-              showFilters ? 'bg-blue-50 border-blue-200 text-blue-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <Filter className="h-4 w-4 mr-2" />
-            Filters
-            {activeFiltersCount > 0 && (
-              <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
-          
-          <Link
-            href="/dashboard/preventive-maintenance/create"
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Maintenance
-          </Link>
-          
-          <Link
-            href="/dashboard/preventive-maintenance/generate-report"
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Generate PDF
-          </Link>
-        </div>
+     
       </div>
 
       {/* Delete Modal */}
