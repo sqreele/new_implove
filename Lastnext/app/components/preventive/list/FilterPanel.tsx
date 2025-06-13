@@ -1,6 +1,7 @@
 'use client';
 
 import { Search, X, ChevronDown } from 'lucide-react';
+import { getFrequencyText } from '@/app/lib/utils/maintenanceUtils'; // Import directly
 
 // Import the FilterState type
 import { FilterState } from '@/app/lib/types/filterTypes';
@@ -14,11 +15,10 @@ interface FilterPanelProps {
   totalCount: number;
   sortBy: SortField;
   sortOrder: 'asc' | 'desc';
-  onFilterChange: (key: keyof FilterState, value: string | number) => void; // Update this line
+  onFilterChange: (key: keyof FilterState, value: string | number) => void;
   onClearFilters: () => void;
   onSortChange: (sortBy: string, sortOrder: string) => void;
-  getMachineNameById: (id: string) => string;
-  getFrequencyText: (frequency: string) => string;
+  // Removed getMachineNameById from props
 }
 
 export default function FilterPanel({
@@ -30,9 +30,14 @@ export default function FilterPanel({
   onFilterChange,
   onClearFilters,
   onSortChange,
-  getMachineNameById,
-  getFrequencyText
+  // Removed getMachineNameById from destructuring
 }: FilterPanelProps) {
+  // Move the machine name lookup logic into the component
+  const getMachineNameById = (machineId: string) => {
+    const machine = machineOptions.find(m => m.id === machineId);
+    return machine ? machine.name : machineId;
+  };
+
   return (
     <>
       {/* Mobile Filter Panel */}

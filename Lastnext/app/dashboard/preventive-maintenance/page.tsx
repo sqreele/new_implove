@@ -313,8 +313,7 @@ export default function PreventiveMaintenanceListPage() {
               setSortBy(newSortBy as SortField);
               setSortOrder(newSortOrder as 'asc' | 'desc');
             }}
-            getMachineNameById={getMachineNameById}
-            getFrequencyText={getFrequencyText}
+           
           />
         )}
 
