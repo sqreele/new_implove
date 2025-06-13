@@ -2,13 +2,19 @@
 
 import { Search, X, ChevronDown } from 'lucide-react';
 
+// Import the FilterState type
+import { FilterState } from '@/app/lib/types/filterTypes';
+
+// Define the sort field type
+type SortField = 'date' | 'status' | 'frequency' | 'machine';
+
 interface FilterPanelProps {
   currentFilters: any;
   machineOptions: any[];
   totalCount: number;
-  sortBy: string;
-  sortOrder: string;
-  onFilterChange: (key: string, value: any) => void;
+  sortBy: SortField;
+  sortOrder: 'asc' | 'desc';
+  onFilterChange: (key: keyof FilterState, value: string | number) => void; // Update this line
   onClearFilters: () => void;
   onSortChange: (sortBy: string, sortOrder: string) => void;
   getMachineNameById: (id: string) => string;
@@ -191,7 +197,7 @@ function FilterChip({ label, onRemove, color }: { label: string; onRemove: () =>
   };
 
   return (
-    <div className={`flex items-center px-3 py-1 rounded-full text-sm ${colorClasses[color]}`}>
+    <div className={`flex items-center px-3 py-1 rounded-full text-sm ${colorClasses[color as keyof typeof colorClasses]}`}>
       <span>{label}</span>
       <button
         onClick={onRemove}
@@ -216,4 +222,3 @@ function FilterSection({ title, children }: { title: string; children: React.Rea
     </details>
   );
 }
-

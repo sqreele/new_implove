@@ -24,4 +24,8 @@ export default function ErrorDisplay({ error, onClear }: ErrorDisplayProps) {
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> dbc6bb4 (addfixmaintain)
