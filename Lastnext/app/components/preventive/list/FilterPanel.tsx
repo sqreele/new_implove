@@ -62,8 +62,8 @@ export default function FilterPanel({
 
   return (
     <>
-      {/* Mobile Filter Panel */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4 md:hidden">
+      {/* Filter Panel */}
+      <div className="bg-white border-b border-gray-200 px-4 py-4">
         {/* Search */}
         <div className="relative mb-4">
           <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
