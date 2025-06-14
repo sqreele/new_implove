@@ -23,7 +23,8 @@ import {
   Printer,
   Settings,
   Building,
-  Camera
+  Camera,
+  Clock
 } from 'lucide-react';
 
 interface PreventiveMaintenanceClientProps {
@@ -46,6 +47,28 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
   const [includeDetails, setIncludeDetails] = useState(true);
   const [imageLoadStatus, setImageLoadStatus] = useState<{before: boolean, after: boolean}>({before: false, after: false});
   const printRef = useRef(null);
+
+  // Helper function to get frequency description
+  const getFrequencyDescription = (frequency: string, customDays?: number | null) => {
+    switch (frequency.toLowerCase()) {
+      case 'daily':
+        return 'This maintenance task is performed every day';
+      case 'weekly':
+        return 'This maintenance task is performed every week';
+      case 'monthly':
+        return 'This maintenance task is performed every month';
+      case 'quarterly':
+        return 'This maintenance task is performed every 3 months';
+      case 'annually':
+        return 'This maintenance task is performed once per year';
+      case 'custom':
+        return customDays 
+          ? `This maintenance task is performed every ${customDays} days`
+          : 'This maintenance task has a custom schedule';
+      default:
+        return `This maintenance task frequency is set to: ${frequency}`;
+    }
+  };
 
   // ฟังก์ชันสำหรับการยืนยันการลบ
   const handleDelete = async () => {
@@ -198,9 +221,11 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
           .text-yellow-600 { color: #ca8a04; }
           .text-red-600 { color: #dc2626; }
           .text-blue-600 { color: #2563eb; }
+          .text-purple-600 { color: #9333ea; }
           .text-gray-600 { color: #4b5563; }
           .grid { display: grid; gap: 16px; }
           .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+          .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
           .font-medium { font-weight: 500; }
           .font-semibold { font-weight: 600; }
           .font-bold { font-weight: bold; }
@@ -215,9 +240,11 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
           .mt-3 { margin-top: 12px; }
           .pt-3 { padding-top: 12px; }
           .border-t { border-top: 1px solid #e5e7eb; }
+          .border-b { border-bottom: 1px solid #e5e7eb; }
           .capitalize { text-transform: capitalize; }
           .text-center { text-align: center; }
           .hidden { display: none; }
+          .schedule-section { background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 20px; }
           img { 
             max-width: 100%; 
             max-height: 300px; 
@@ -233,6 +260,8 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
           @media print {
             body { margin: 0; font-size: 12px; }
             .maintenance-item { page-break-inside: avoid; }
+            .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+            .text-purple-600 { color: #9333ea !important; }
             img { 
               max-height: 250px !important; 
               page-break-inside: avoid;
@@ -242,6 +271,7 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
           }
           @media screen and (max-width: 768px) {
             .grid-cols-2 { grid-template-columns: 1fr; }
+            .grid-cols-3 { grid-template-columns: 1fr; }
           }
         </style>
       </head>
@@ -485,8 +515,10 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
                 <p><strong>Debug Info:</strong></p>
                 <p>Before Image URL: {beforeImageUrl ? '✓ Available' : '✗ Missing'}</p>
                 <p>After Image URL: {afterImageUrl ? '✓ Available' : '✗ Missing'}</p>
+                <p>Procedure: {(maintenanceData as any).procedure ? '✓ Available' : '✗ Missing'}</p>
                 {beforeImageUrl && <p className="truncate">Before: {beforeImageUrl}</p>}
                 {afterImageUrl && <p className="truncate">After: {afterImageUrl}</p>}
+                {(maintenanceData as any).procedure && <p>Procedure: {(maintenanceData as any).procedure}</p>}
               </div>
             </div>
           )}
@@ -527,6 +559,73 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
                 <span className="font-medium">{formatDate(maintenanceData.next_due_date)}</span>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Maintenance Schedule Section */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Maintenance Schedule</h3>
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-center">
+                <Clock className="h-5 w-5 mr-2 text-blue-600" />
+                <div>
+                  <span className="text-gray-600 text-sm block">Frequency</span>
+                  <span className="font-medium capitalize text-lg">
+                    {maintenanceData.frequency}
+                    {maintenanceData.custom_days && ` (${maintenanceData.custom_days} days)`}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex items-center">
+                <Calendar className="h-5 w-5 mr-2 text-green-600" />
+                <div>
+                  <span className="text-gray-600 text-sm block">Last Completed</span>
+                  <span className="font-medium">
+                    {maintenanceData.completed_date 
+                      ? formatDate(maintenanceData.completed_date)
+                      : 'Not completed yet'
+                    }
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex items-center">
+                <Calendar className="h-5 w-5 mr-2 text-orange-600" />
+                <div>
+                  <span className="text-gray-600 text-sm block">Next Due</span>
+                  <span className="font-medium">
+                    {maintenanceData.next_due_date 
+                      ? formatDate(maintenanceData.next_due_date)
+                      : 'Not scheduled'
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Add Procedure Information */}
+            {(maintenanceData as any).procedure && (
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <div className="flex items-start">
+                  <FileText className="h-5 w-5 mr-2 text-purple-600 mt-0.5" />
+                  <div>
+                    <span className="text-gray-600 text-sm block">Procedure</span>
+                    <span className="font-medium text-gray-900">
+                      {(maintenanceData as any).procedure}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Frequency Description */}
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <span className="text-sm text-gray-600">
+                {getFrequencyDescription(maintenanceData.frequency, maintenanceData.custom_days)}
+              </span>
+            </div>
           </div>
         </div>
         
@@ -619,250 +718,280 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
             )}
             
             <Link
-              href={`/dashboard/preventive-maintenance/edit/${maintenanceData.pm_id}`}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-center"
-            >
-              Edit
-            </Link>
-            <button
-              onClick={handleDelete}
-              disabled={isLoading}
-              className={`px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${
-                isLoading ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              {isLoading ? 'Deleting...' : 'Delete'}
-            </button>
-          </div>
-        </div>
-      </div>
+             href={`/dashboard/preventive-maintenance/edit/${maintenanceData.pm_id}`}
+             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-center"
+           >
+             Edit
+           </Link>
+           <button
+             onClick={handleDelete}
+             disabled={isLoading}
+             className={`px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${
+               isLoading ? 'opacity-50 cursor-not-allowed' : ''
+             }`}
+           >
+             {isLoading ? 'Deleting...' : 'Delete'}
+           </button>
+         </div>
+       </div>
+     </div>
 
-      {/* PDF Content (Hidden on screen, visible when printing) */}
-      <div id="pdf-content" ref={printRef} className="hidden print:block bg-white">
-        {/* Header */}
-        <div className="header text-center mb-8 border-b-2 border-gray-300 pb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Maintenance Record Report</h1>
-          <p className="text-gray-600">Generated on {new Date().toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          })}</p>
-          <div className="flex justify-center items-center mt-4 text-sm text-gray-500">
-            <Building className="h-4 w-4 mr-2" />
-            Facility Management System
-          </div>
-        </div>
+     {/* PDF Content (Hidden on screen, visible when printing) */}
+     <div id="pdf-content" ref={printRef} className="hidden print:block bg-white">
+       {/* Header */}
+       <div className="header text-center mb-8 border-b-2 border-gray-300 pb-6">
+         <h1 className="text-3xl font-bold text-gray-900 mb-2">Maintenance Record Report</h1>
+         <p className="text-gray-600">Generated on {new Date().toLocaleDateString('en-US', {
+           year: 'numeric',
+           month: 'long',
+           day: 'numeric',
+           hour: '2-digit',
+           minute: '2-digit'
+         })}</p>
+         <div className="flex justify-center items-center mt-4 text-sm text-gray-500">
+           <Building className="h-4 w-4 mr-2" />
+           Facility Management System
+         </div>
+       </div>
 
-        {/* Maintenance Details */}
-        <div className="maintenance-item border border-gray-300 rounded-lg p-6 mb-6">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h2 className="text-2xl font-semibold text-gray-900">
-                {maintenanceData.pmtitle || 'Maintenance Task'}
-              </h2>
-              <p className="text-sm text-gray-600">ID: {maintenanceData.pm_id}</p>
-            </div>
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor()}`}>
-              {getTaskStatus().toUpperCase()}
-            </span>
-          </div>
+       {/* Maintenance Details */}
+       <div className="maintenance-item border border-gray-300 rounded-lg p-6 mb-6">
+         <div className="flex justify-between items-start mb-4">
+           <div>
+             <h2 className="text-2xl font-semibold text-gray-900">
+               {maintenanceData.pmtitle || 'Maintenance Task'}
+             </h2>
+             <p className="text-sm text-gray-600">ID: {maintenanceData.pm_id}</p>
+           </div>
+           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor()}`}>
+             {getTaskStatus().toUpperCase()}
+           </span>
+         </div>
 
-          {includeDetails && (
-            <>
-              {(maintenanceData as any).job_description && (
-                <div className="mb-4">
-                  <span className="font-medium text-gray-600">Description:</span>
-                  <p className="text-gray-700 mt-1">{(maintenanceData as any).job_description}</p>
-                </div>
-              )}
+         {includeDetails && (
+           <>
+             {(maintenanceData as any).job_description && (
+               <div className="mb-4">
+                 <span className="font-medium text-gray-600">Description:</span>
+                 <p className="text-gray-700 mt-1">{(maintenanceData as any).job_description}</p>
+               </div>
+             )}
 
-              {maintenanceData.notes && (
-                <div className="mb-4">
-                  <span className="font-medium text-gray-600">Notes:</span>
-                  <p className="text-gray-700 mt-1">{maintenanceData.notes}</p>
-                </div>
-              )}
-            </>
-          )}
+             {maintenanceData.notes && (
+               <div className="mb-4">
+                 <span className="font-medium text-gray-600">Notes:</span>
+                 <p className="text-gray-700 mt-1">{maintenanceData.notes}</p>
+               </div>
+             )}
+           </>
+         )}
 
-          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-            <div>
-              <span className="font-medium text-gray-600">Scheduled:</span>
-              <p>{formatDate(maintenanceData.scheduled_date)}</p>
-            </div>
-            <div>
-              <span className="font-medium text-gray-600">Frequency:</span>
-              <p className="capitalize">{maintenanceData.frequency}</p>
-            </div>
-            <div>
-              <span className="font-medium text-gray-600">Topics:</span>
-              <p>{getTopicsString()}</p>
-            </div>
-            <div>
-              <span className="font-medium text-gray-600">Next Due:</span>
-              <p>{maintenanceData.next_due_date ? formatDate(maintenanceData.next_due_date) : 'N/A'}</p>
-            </div>
-          </div>
+         {/* Schedule Information Section for PDF */}
+         <div className="schedule-section mb-4">
+           <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+             <Clock className="h-4 w-4 mr-2" />
+             Maintenance Schedule
+           </h3>
+           <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+             <div>
+               <span className="font-medium text-gray-600">Frequency:</span>
+               <p className="capitalize">
+                 {maintenanceData.frequency}
+                 {maintenanceData.custom_days && ` (${maintenanceData.custom_days} days)`}
+               </p>
+             </div>
+             <div>
+               <span className="font-medium text-gray-600">Scheduled:</span>
+               <p>{formatDate(maintenanceData.scheduled_date)}</p>
+             </div>
+             <div>
+               <span className="font-medium text-gray-600">Next Due:</span>
+               <p>{maintenanceData.next_due_date ? formatDate(maintenanceData.next_due_date) : 'N/A'}</p>
+             </div>
+           </div>
+           
+           {/* Add Procedure to PDF */}
+           {(maintenanceData as any).procedure && (
+             <div className="mb-3 pb-2 border-b border-gray-200">
+               <span className="font-medium text-gray-600">Procedure:</span>
+               <p className="text-gray-700 mt-1">{(maintenanceData as any).procedure}</p>
+             </div>
+           )}
+           
+           <div className="text-sm text-gray-600 border-t border-gray-200 pt-2">
+             <span className="font-medium">Schedule Details:</span> {getFrequencyDescription(maintenanceData.frequency, maintenanceData.custom_days)}
+           </div>
+         </div>
 
-          <div className="mb-4">
-            <span className="font-medium text-gray-600">Machines:</span>
-            <p className="text-gray-700 mt-1">{getMachinesString()}</p>
-          </div>
+         <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+           <div>
+             <span className="font-medium text-gray-600">Topics:</span>
+             <p>{getTopicsString()}</p>
+           </div>
+           <div>
+             <span className="font-medium text-gray-600">Property ID:</span>
+             <p>{maintenanceData.property_id || 'N/A'}</p>
+           </div>
+         </div>
 
-          {maintenanceData.property_id && (
-            <div className="mb-4">
-              <span className="font-medium text-gray-600">Property ID:</span>
-              <p className="text-gray-700 mt-1">{maintenanceData.property_id}</p>
-            </div>
-          )}
+         <div className="mb-4">
+           <span className="font-medium text-gray-600">Machines:</span>
+           <p className="text-gray-700 mt-1">{getMachinesString()}</p>
+         </div>
 
-          {maintenanceData.completed_date && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <span className="font-medium text-green-600">
-                Completed on: {formatDate(maintenanceData.completed_date)}
-              </span>
-            </div>
-          )}
+         {maintenanceData.completed_date && (
+           <div className="mt-4 pt-4 border-t border-gray-200">
+             <span className="font-medium text-green-600">
+               Completed on: {formatDate(maintenanceData.completed_date)}
+             </span>
+           </div>
+         )}
 
-          {includeImages && (beforeImageUrl || afterImageUrl) && (
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <h3 className="font-medium text-gray-700 mb-4 flex items-center">
-                <Camera className="h-4 w-4 mr-2" />
-                Maintenance Images
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {beforeImageUrl && (
-                  <div>
-                    <span className="text-sm font-medium text-gray-600 block mb-2">Before:</span>
-                    <img 
-                      src={beforeImageUrl} 
-                      alt="Before maintenance" 
-                      className="w-full max-h-64 object-contain rounded-lg border border-gray-300"
-                      onError={(e: any) => {
-                        e.target.style.display = 'none';
-                        if (e.target.nextSibling) {
-                          e.target.nextSibling.style.display = 'block';
-                        }
-                      }}
-                      onLoad={(e: any) => {
-                        // Ensure image is visible when it loads successfully
-                        e.target.style.display = 'block';
-                        if (e.target.nextSibling) {
-                          e.target.nextSibling.style.display = 'none';
-                        }
-                      }}
-                    />
-                    <div className="hidden w-full h-48 bg-gray-100 rounded-lg border border-gray-300 flex items-center justify-center">
-                      <span className="text-gray-500 text-sm">Before image unavailable</span>
-                    </div>
-                  </div>
-                )}
-                {afterImageUrl && (
-                  <div>
-                    <span className="text-sm font-medium text-gray-600 block mb-2">After:</span>
-                    <img 
-                      src={afterImageUrl} 
-                      alt="After maintenance" 
-                      className="w-full max-h-64 object-contain rounded-lg border border-gray-300"
-                      onError={(e: any) => {
-                        e.target.style.display = 'none';
-                        if (e.target.nextSibling) {
-                          e.target.nextSibling.style.display = 'block';
-                        }
-                      }}
-                      onLoad={(e: any) => {
-                        // Ensure image is visible when it loads successfully
-                        e.target.style.display = 'block';
-                        if (e.target.nextSibling) {
-                          e.target.nextSibling.style.display = 'none';
-                        }
-                      }}
-                    />
-                    <div className="hidden w-full h-48 bg-gray-100 rounded-lg border border-gray-300 flex items-center justify-center">
-                      <span className="text-gray-500 text-sm">After image unavailable</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+         {includeImages && (beforeImageUrl || afterImageUrl) && (
+           <div className="mt-6 pt-4 border-t border-gray-200">
+             <h3 className="font-medium text-gray-700 mb-4 flex items-center">
+               <Camera className="h-4 w-4 mr-2" />
+               Maintenance Images
+             </h3>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               {beforeImageUrl && (
+                 <div>
+                   <span className="text-sm font-medium text-gray-600 block mb-2">Before:</span>
+                   <img 
+                     src={beforeImageUrl} 
+                     alt="Before maintenance" 
+                     className="w-full max-h-64 object-contain rounded-lg border border-gray-300"
+                     onError={(e: any) => {
+                       e.target.style.display = 'none';
+                       if (e.target.nextSibling) {
+                         e.target.nextSibling.style.display = 'block';
+                       }
+                     }}
+                     onLoad={(e: any) => {
+                       // Ensure image is visible when it loads successfully
+                       e.target.style.display = 'block';
+                       if (e.target.nextSibling) {
+                         e.target.nextSibling.style.display = 'none';
+                       }
+                     }}
+                   />
+                   <div className="hidden w-full h-48 bg-gray-100 rounded-lg border border-gray-300 flex items-center justify-center">
+                     <span className="text-gray-500 text-sm">Before image unavailable</span>
+                   </div>
+                 </div>
+               )}
+               {afterImageUrl && (
+                 <div>
+                   <span className="text-sm font-medium text-gray-600 block mb-2">After:</span>
+                   <img 
+                     src={afterImageUrl} 
+                     alt="After maintenance" 
+                     className="w-full max-h-64 object-contain rounded-lg border border-gray-300"
+                     onError={(e: any) => {
+                       e.target.style.display = 'none';
+                       if (e.target.nextSibling) {
+                         e.target.nextSibling.style.display = 'block';
+                       }
+                     }}
+                     onLoad={(e: any) => {
+                       // Ensure image is visible when it loads successfully
+                       e.target.style.display = 'block';
+                       if (e.target.nextSibling) {
+                         e.target.nextSibling.style.display = 'none';
+                       }
+                     }}
+                   />
+                   <div className="hidden w-full h-48 bg-gray-100 rounded-lg border border-gray-300 flex items-center justify-center">
+                     <span className="text-gray-500 text-sm">After image unavailable</span>
+                   </div>
+                 </div>
+               )}
+             </div>
+           </div>
+         )}
+       </div>
 
-        {/* Footer */}
-        <div className="border-t border-gray-300 pt-4 text-center text-sm text-gray-500">
-          <p>This report was automatically generated by the Facility Management System</p>
-          <p>© 2025 - Confidential and Proprietary Information</p>
-        </div>
-      </div>
+       {/* Footer */}
+       <div className="border-t border-gray-300 pt-4 text-center text-sm text-gray-500">
+         <p>This report was automatically generated by the Facility Management System</p>
+         <p>© 2025 - Confidential and Proprietary Information</p>
+       </div>
+     </div>
 
-      {/* Image modal */}
-      {isImageModalOpen && currentImage && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={closeImageModal}
-        >
-          <div className="relative max-w-4xl max-h-screen w-full h-full flex items-center justify-center">
-            <button 
-              className="absolute top-4 right-4 bg-white rounded-full p-2 z-10 flex items-center justify-center"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeImageModal();
-              }}
-              aria-label="Close"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <img 
-              src={currentImage} 
-              alt={currentImageAlt}
-              className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        </div>
-      )}
+     {/* Image modal */}
+     {isImageModalOpen && currentImage && (
+       <div 
+         className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+         onClick={closeImageModal}
+       >
+         <div className="relative max-w-4xl max-h-screen w-full h-full flex items-center justify-center">
+           <button 
+             className="absolute top-4 right-4 bg-white rounded-full p-2 z-10 flex items-center justify-center"
+             onClick={(e) => {
+               e.stopPropagation();
+               closeImageModal();
+             }}
+             aria-label="Close"
+           >
+             <X className="h-5 w-5" />
+           </button>
+           <img 
+             src={currentImage} 
+             alt={currentImageAlt}
+             className="max-w-full max-h-full object-contain"
+             onClick={(e) => e.stopPropagation()}
+           />
+         </div>
+       </div>
+     )}
 
-      <style jsx>{`
-        @media print {
-          .no-print {
-            display: none !important;
-          }
-          #pdf-content {
-            display: block !important;
-          }
-          body {
-            margin: 0;
-            padding: 0;
-          }
-          img {
-            max-height: 300px !important;
-            max-width: 100% !important;
-            page-break-inside: avoid;
-            display: block !important;
-            -webkit-print-color-adjust: exact;
-            color-adjust: exact;
-          }
-          .maintenance-item {
-            page-break-inside: avoid;
-          }
-          .hidden {
-            display: none !important;
-          }
-        }
-        
-        @media screen {
-          #pdf-content {
-            display: none;
-          }
-        }
-        
-        /* Ensure images load properly */
-        #pdf-content img {
-          background: white;
-        }
-      `}</style>
-    </>
-  );
+     <style jsx>{`
+       @media print {
+         .no-print {
+           display: none !important;
+         }
+         #pdf-content {
+           display: block !important;
+         }
+         body {
+           margin: 0;
+           padding: 0;
+         }
+         img {
+           max-height: 300px !important;
+           max-width: 100% !important;
+           page-break-inside: avoid;
+           display: block !important;
+           -webkit-print-color-adjust: exact;
+           color-adjust: exact;
+         }
+         .maintenance-item {
+           page-break-inside: avoid;
+         }
+         .hidden {
+           display: none !important;
+         }
+         .schedule-section {
+           background-color: #f9fafb !important;
+           -webkit-print-color-adjust: exact;
+           color-adjust: exact;
+         }
+         .text-purple-600 {
+           color: #9333ea !important;
+         }
+       }
+       
+       @media screen {
+         #pdf-content {
+           display: none;
+         }
+       }
+       
+       /* Ensure images load properly */
+       #pdf-content img {
+         background: white;
+       }
+     `}</style>
+   </>
+ );
 }
