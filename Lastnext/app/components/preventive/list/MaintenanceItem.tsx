@@ -80,12 +80,14 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
                       <span className="truncate">{item.procedure}</span>
                     </div>
                   )}
-                  {!item.procedure && item.machines?.[0]?.procedure && (
-                    <div className="flex items-center">
-                      <Clipboard className="h-3 w-3 mr-1" />
-                      <span className="truncate">{item.machines[0].procedure}</span>
-                    </div>
-                  )}
+                  {!item.procedure && item.machines?.map(machine => (
+                    machine.procedure && machine.procedure !== "0" && (
+                      <div key={machine.machine_id} className="flex items-center">
+                        <Clipboard className="h-3 w-3 mr-1" />
+                        <span className="truncate">{machine.procedure}</span>
+                      </div>
+                    )
+                  ))}
                 </div>
                 
                 <div className="flex items-center justify-between mt-3">
@@ -149,7 +151,7 @@ const MaintenanceItem: React.FC<MaintenanceItemProps> = ({
               </div>
               
               <div className="text-sm text-gray-900 truncate">
-                {item.procedure || (item.machines?.[0]?.procedure) || '-'}
+                {item.procedure || item.machines?.find(m => m.procedure && m.procedure !== "0")?.procedure || '-'}
               </div>
               
               <div className="flex items-center space-x-2">
