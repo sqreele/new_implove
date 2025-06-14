@@ -70,6 +70,67 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
     }
   };
 
+  // Helper function to get procedures from machines
+  const getMachineProcedures = () => {
+    if (!maintenanceData.machines || maintenanceData.machines.length === 0) {
+      return [];
+    }
+
+    const procedures = maintenanceData.machines
+      .filter(machine => typeof machine === 'object' && (machine as any).procedure)
+      .map(machine => ({
+        machineName: (machine as any).name || (machine as any).machine_id,
+        procedure: (machine as any).procedure
+      }));
+
+    return procedures;
+  };
+
+  // Helper function to render procedures
+  const renderProcedures = () => {
+    const procedures = getMachineProcedures();
+    
+    if (procedures.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="mt-4 pt-3 border-t border-gray-200">
+        <div className="flex items-start">
+          <FileText className="h-5 w-5 mr-2 text-purple-600 mt-0.5" />
+          <div className="flex-1">
+            <span className="text-gray-600 text-sm block mb-2">Machine Procedures</span>
+            <div className="space-y-2">
+              {procedures.map((item, index) => (
+                <div key={index} className="bg-white border border-gray-200 rounded-md p-3">
+                  <div className="font-medium text-gray-900 text-sm mb-1">
+                    {item.machineName}
+                  </div>
+                  <div className="text-gray-700 text-sm">
+                    {item.procedure}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Helper function for PDF procedures
+  const getProceduresString = () => {
+    const procedures = getMachineProcedures();
+    
+    if (procedures.length === 0) {
+      return 'No procedures available';
+    }
+
+    return procedures.map(item => 
+      `${item.machineName}: ${item.procedure}`
+    ).join('; ');
+  };
+
   // ฟังก์ชันสำหรับการยืนยันการลบ
   const handleDelete = async () => {
     if (!window.confirm('Are you sure you want to delete this maintenance record?')) {
@@ -245,6 +306,7 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
           .text-center { text-align: center; }
           .hidden { display: none; }
           .schedule-section { background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 20px; }
+          .procedure-item { background-color: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px; }
           img { 
             max-width: 100%; 
             max-height: 300px; 
@@ -515,10 +577,12 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
                 <p><strong>Debug Info:</strong></p>
                 <p>Before Image URL: {beforeImageUrl ? '✓ Available' : '✗ Missing'}</p>
                 <p>After Image URL: {afterImageUrl ? '✓ Available' : '✗ Missing'}</p>
-                <p>Procedure: {(maintenanceData as any).procedure ? '✓ Available' : '✗ Missing'}</p>
+                <p>Machine Procedures: {getMachineProcedures().length > 0 ? '✓ Available' : '✗ Missing'}</p>
                 {beforeImageUrl && <p className="truncate">Before: {beforeImageUrl}</p>}
                 {afterImageUrl && <p className="truncate">After: {afterImageUrl}</p>}
-                {(maintenanceData as any).procedure && <p>Procedure: {(maintenanceData as any).procedure}</p>}
+                {getMachineProcedures().length > 0 && (
+                  <p className="truncate">Procedures: {getProceduresString()}</p>
+                )}
               </div>
             </div>
           )}
@@ -605,20 +669,8 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
               </div>
             </div>
             
-            {/* Add Procedure Information */}
-            {(maintenanceData as any).procedure && (
-              <div className="mt-4 pt-3 border-t border-gray-200">
-                <div className="flex items-start">
-                  <FileText className="h-5 w-5 mr-2 text-purple-600 mt-0.5" />
-                  <div>
-                    <span className="text-gray-600 text-sm block">Procedure</span>
-                    <span className="font-medium text-gray-900">
-                      {(maintenanceData as any).procedure}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Add Machine Procedures Information */}
+            {renderProcedures()}
             
             {/* Frequency Description */}
             <div className="mt-3 pt-3 border-t border-gray-200">
@@ -684,40 +736,40 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
             </div>
           ) : (
             <div className="flex items-center justify-center w-full h-48 bg-gray-100 rounded-md">
-              <p className="text-gray-500 italic">No after image</p>
-            </div>
-          )}
-        </div>
+             <p className="text-gray-500 italic">No after image</p>
+           </div>
+         )}
+       </div>
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">
-            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+       {error && (
+         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">
+           <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+           <span>{error}</span>
+         </div>
+       )}
 
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <Link
-            href="/dashboard/preventive-maintenance"
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-center"
-          >
-            Back to List
-          </Link>
+       <div className="flex flex-col sm:flex-row justify-between gap-4">
+         <Link
+           href="/dashboard/preventive-maintenance"
+           className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-center"
+         >
+           Back to List
+         </Link>
 
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-            {!maintenanceData.completed_date && (
-              <button
-                onClick={handleMarkComplete}
-                disabled={isCompleting}
-                className={`px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
-                  isCompleting ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                {isCompleting ? 'Completing...' : 'Mark Complete'}
-              </button>
-            )}
-            
-            <Link
+         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+           {!maintenanceData.completed_date && (
+             <button
+               onClick={handleMarkComplete}
+               disabled={isCompleting}
+               className={`px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                 isCompleting ? 'opacity-50 cursor-not-allowed' : ''
+               }`}
+             >
+               {isCompleting ? 'Completing...' : 'Mark Complete'}
+             </button>
+           )}
+           
+           <Link
              href={`/dashboard/preventive-maintenance/edit/${maintenanceData.pm_id}`}
              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-center"
            >
@@ -810,11 +862,18 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
              </div>
            </div>
            
-           {/* Add Procedure to PDF */}
-           {(maintenanceData as any).procedure && (
+           {/* Add Machine Procedures to PDF */}
+           {getMachineProcedures().length > 0 && (
              <div className="mb-3 pb-2 border-b border-gray-200">
-               <span className="font-medium text-gray-600">Procedure:</span>
-               <p className="text-gray-700 mt-1">{(maintenanceData as any).procedure}</p>
+               <span className="font-medium text-gray-600">Machine Procedures:</span>
+               <div className="mt-2 space-y-2">
+                 {getMachineProcedures().map((item, index) => (
+                   <div key={index} className="procedure-item">
+                     <div className="font-medium text-sm text-gray-900">{item.machineName}:</div>
+                     <div className="text-gray-700 text-sm">{item.procedure}</div>
+                   </div>
+                 ))}
+               </div>
              </div>
            )}
            
@@ -978,6 +1037,12 @@ export default function PreventiveMaintenanceClient({ maintenanceData }: Prevent
          }
          .text-purple-600 {
            color: #9333ea !important;
+         }
+         .procedure-item {
+           background-color: white !important;
+           border: 1px solid #e5e7eb !important;
+           -webkit-print-color-adjust: exact;
+           color-adjust: exact;
          }
        }
        
