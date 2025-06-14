@@ -17,7 +17,7 @@ import apiClient from '@/app/lib/api-client';
 import FileUpload from '@/app/components/jobs/FileUpload';
 import { useToast } from '@/app/lib/hooks/use-toast';
 import { useProperty } from '@/app/lib/PropertyContext';
-import preventiveMaintenanceService, {
+import { preventiveMaintenanceService, 
   type CreatePreventiveMaintenanceData,
   type UpdatePreventiveMaintenanceData,
 } from '@/app/lib/PreventiveMaintenanceService';
@@ -383,7 +383,7 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
         completed_date: values.completed_date || undefined,
         before_image: hasBeforeImageFile ? values.before_image_file! : undefined,
         after_image: hasAfterImageFile ? values.after_image_file! : undefined,
-        procedure: values.procedure || undefined,
+        procedure: values.procedure?.trim() || '',
       };
 
       console.log('[FORM] handleSubmit - Data prepared for service:', JSON.stringify(dataForService, (key, value) => {
@@ -630,6 +630,21 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
               />
             </div>
 
+            {/* Procedure */}
+            <div className="mb-6">
+              <label htmlFor="procedure" className="block text-sm font-medium text-gray-700 mb-1">
+                Procedure
+              </label>
+              <Field
+                as="textarea"
+                id="procedure"
+                name="procedure"
+                rows={4}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                placeholder="Enter the maintenance procedure"
+              />
+            </div>
+
             {/* Machines Selection */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -871,24 +886,6 @@ const PreventiveMaintenanceForm: React.FC<PreventiveMaintenanceFormProps> = ({
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Procedure */}
-            <div className="mb-6">
-              <label htmlFor="procedure" className="block text-sm font-medium text-gray-700 mb-1">
-                Procedure
-              </label>
-              <Field
-                as="textarea"
-                id="procedure"
-                name="procedure"
-                rows={4}
-                className={`w-full p-2 border rounded-md ${
-                  errors.procedure && touched.procedure ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Enter maintenance procedure steps..."
-              />
-              {errors.procedure && touched.procedure && <p className="mt-1 text-sm text-red-500">{errors.procedure}</p>}
             </div>
 
             {/* Action Buttons */}

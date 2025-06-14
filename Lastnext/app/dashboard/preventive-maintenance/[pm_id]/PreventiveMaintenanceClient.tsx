@@ -1,7 +1,7 @@
 // app/dashboard/preventive-maintenance/[pm_id]/PreventiveMaintenanceClient.tsx
 
 'use client';
-import preventiveMaintenanceService from '@/app/lib/PreventiveMaintenanceService';
+import { preventiveMaintenanceService } from '@/app/lib/PreventiveMaintenanceService';
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';

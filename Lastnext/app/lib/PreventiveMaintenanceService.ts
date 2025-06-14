@@ -370,7 +370,8 @@ class PreventiveMaintenanceService {
       if (data.completed_date) formData.append('completed_date', data.completed_date);
       formData.append('frequency', data.frequency);
       if (data.custom_days != null) formData.append('custom_days', String(data.custom_days));
-      if (data.notes?.trim()) formData.append('notes', data.notes.trim());
+      if (data.notes !== undefined) formData.append('notes', data.notes?.trim() || '');
+      if (data.procedure !== undefined) formData.append('procedure', data.procedure?.trim() || '');
       
       // Add array fields - FIXED: removed [] from field names
       if (data.topic_ids?.length) {
@@ -507,6 +508,7 @@ class PreventiveMaintenanceService {
         formData.append('custom_days', data.custom_days != null ? String(data.custom_days) : '');
       }
       if (data.notes !== undefined) formData.append('notes', data.notes?.trim() || '');
+      if (data.procedure !== undefined) formData.append('procedure', data.procedure?.trim() || '');
       
       // Add array fields - FIXED: removed [] from field names
       if (data.topic_ids !== undefined) {
@@ -805,16 +807,19 @@ class PreventiveMaintenanceService {
           } else {
             console.log(`❌ Target machine ${machineId} NOT found in results`);
           }
-          
+          console.log(`\n🔍 Checking machine data structure:`, {
+            machineId,
+            params,
+            responseData: response.data
+          });
         } catch (error) {
-          console.log(`❌ Failed with params ${JSON.stringify(params)}:`, (error as Error).message);
+          console.error('Error in debugMachineFiltering:', error);
         }
       }
-      
     } catch (error) {
-      console.error('Debug failed:', error);
+      console.error('Debug error:', error);
     }
   }
 }
 
-export default new PreventiveMaintenanceService();
+export const preventiveMaintenanceService = new PreventiveMaintenanceService();

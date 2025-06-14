@@ -9,7 +9,8 @@ import {
   ServiceResponse,
   itemMatchesMachine // ✅ Import the helper function
 } from '@/app/lib/preventiveMaintenanceModels';
-import preventiveMaintenanceService, { 
+import { 
+  preventiveMaintenanceService,
   CreatePreventiveMaintenanceData, 
   UpdatePreventiveMaintenanceData,
   CompletePreventiveMaintenanceData,
