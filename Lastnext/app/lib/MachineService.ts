@@ -24,7 +24,7 @@ export default class MachineService {
   async getMachines(propertyId?: string): Promise<ServiceResponse<Machine[]>> {
     try {
       const params = propertyId ? { property_id: propertyId } : {};
-      console.log('Fetching machines with params:', params);
+      console.log('🏭 Fetching machines with params:', params);
       
       const response = await apiClient.get<Machine[]>(this.baseUrl, { params });
       console.log('✅ Machines received:', response.data);
