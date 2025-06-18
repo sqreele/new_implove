@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect } from 'react';
-import { useAppStore, useUserStore, useJobsStore, useMaintenanceStore, useCommonStore } from '../store/AppStore';
+import { useAppStore, useUserStore, useJobsStore, useMaintenanceStore, useCommonStore } from '@/app/lib/store/AppStore';
 import { 
   jobService, 
   propertyService, 

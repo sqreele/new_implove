@@ -1,42 +1,17 @@
-/**
- * Unified Application Store using Zustand
- * Centralized state management for better maintainability and scalability
- */
-
 import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
-import type { 
-  Job, 
-  Property, 
-  Room, 
-  Topic, 
-  UserProfile
-} from '@/app/lib/types';
-import type { 
-  PreventiveMaintenance,
-  MachineDetails,
-  DashboardStats
-} from '@/app/lib/types/preventiveMaintenanceModels';
 
-// =================================================================
-// Store State Interfaces
-// =================================================================
-
+// Define the store state type
 interface AppState {
-  // User & Authentication
   user: {
-    profile: UserProfile | null;
+    profile: any;
     selectedProperty: string | null;
-    userProperties: Property[];
+    userProperties: any[];
     isLoading: boolean;
     error: string | null;
   };
-
-  // Jobs
   jobs: {
-    items: Job[];
-    selectedJob: Job | null;
+    items: any[];
+    selectedJob: any;
     isLoading: boolean;
     error: string | null;
     filters: {
@@ -48,12 +23,10 @@ interface AppState {
       pageSize: number;
     };
   };
-
-  // Preventive Maintenance
   maintenance: {
-    items: PreventiveMaintenance[];
-    selectedMaintenance: PreventiveMaintenance | null;
-    statistics: DashboardStats | null;
+    items: any[];
+    selectedMaintenance: any;
+    statistics: any;
     isLoading: boolean;
     error: string | null;
     filters: {
@@ -66,77 +39,58 @@ interface AppState {
       pageSize: number;
     };
   };
-
-  // Common Data
   common: {
-    properties: Property[];
-    rooms: Room[];
-    topics: Topic[];
-    machines: MachineDetails[];
+    properties: any[];
+    rooms: any[];
+    topics: any[];
+    machines: any[];
     isLoading: boolean;
     error: string | null;
   };
 }
 
-// =================================================================
-// Store Actions Interface
-// =================================================================
-
+// Define the store actions type
 interface AppActions {
-  // User Actions
-  setUserProfile: (profile: UserProfile | null) => void;
+  setUserProfile: (profile: any) => void;
   setSelectedProperty: (propertyId: string | null) => void;
-  setUserProperties: (properties: Property[]) => void;
+  setUserProperties: (properties: any[]) => void;
   setUserLoading: (loading: boolean) => void;
   setUserError: (error: string | null) => void;
-
-  // Job Actions
-  setJobs: (jobs: Job[]) => void;
-  addJob: (job: Job) => void;
-  updateJob: (id: string, updates: Partial<Job>) => void;
+  setJobs: (jobs: any[]) => void;
+  addJob: (job: any) => void;
+  updateJob: (id: string, updates: any) => void;
   deleteJob: (id: string) => void;
-  setSelectedJob: (job: Job | null) => void;
+  setSelectedJob: (job: any) => void;
   setJobsLoading: (loading: boolean) => void;
   setJobsError: (error: string | null) => void;
-  setJobFilters: (filters: Partial<AppState['jobs']['filters']>) => void;
+  setJobFilters: (filters: any) => void;
   resetJobFilters: () => void;
-
-  // Maintenance Actions
-  setMaintenanceItems: (items: PreventiveMaintenance[]) => void;
-  addMaintenance: (item: PreventiveMaintenance) => void;
-  updateMaintenance: (id: string, updates: Partial<PreventiveMaintenance>) => void;
+  setMaintenanceItems: (items: any[]) => void;
+  addMaintenance: (item: any) => void;
+  updateMaintenance: (id: string, updates: any) => void;
   deleteMaintenance: (id: string) => void;
-  setSelectedMaintenance: (item: PreventiveMaintenance | null) => void;
-  setMaintenanceStatistics: (stats: DashboardStats | null) => void;
+  setSelectedMaintenance: (item: any) => void;
+  setMaintenanceStatistics: (stats: any) => void;
   setMaintenanceLoading: (loading: boolean) => void;
   setMaintenanceError: (error: string | null) => void;
-  setMaintenanceFilters: (filters: Partial<AppState['maintenance']['filters']>) => void;
+  setMaintenanceFilters: (filters: any) => void;
   resetMaintenanceFilters: () => void;
-
-  // Common Data Actions
-  setProperties: (properties: Property[]) => void;
-  setRooms: (rooms: Room[]) => void;
-  setTopics: (topics: Topic[]) => void;
-  setMachines: (machines: MachineDetails[]) => void;
+  setProperties: (properties: any[]) => void;
+  setRooms: (rooms: any[]) => void;
+  setTopics: (topics: any[]) => void;
+  setMachines: (machines: any[]) => void;
   setCommonLoading: (loading: boolean) => void;
   setCommonError: (error: string | null) => void;
-
-  // Utility Actions
   clearErrors: () => void;
   resetStore: () => void;
 }
 
-// =================================================================
-// Store Type
-// =================================================================
-
+// Store type
 type AppStore = AppState & AppActions;
 
-// =================================================================
-// Initial State
-// =================================================================
-
-const initialState: AppState = {
+// Basic store implementation
+export const useAppStore = create<AppStore>((set, get) => ({
+  // User state
   user: {
     profile: null,
     selectedProperty: null,
@@ -144,6 +98,8 @@ const initialState: AppState = {
     isLoading: false,
     error: null,
   },
+  
+  // Jobs state
   jobs: {
     items: [],
     selectedJob: null,
@@ -158,6 +114,8 @@ const initialState: AppState = {
       pageSize: 10,
     },
   },
+  
+  // Maintenance state
   maintenance: {
     items: [],
     selectedMaintenance: null,
@@ -174,6 +132,8 @@ const initialState: AppState = {
       pageSize: 10,
     },
   },
+  
+  // Common state
   common: {
     properties: [],
     rooms: [],
@@ -182,247 +142,111 @@ const initialState: AppState = {
     isLoading: false,
     error: null,
   },
-};
-
-// =================================================================
-// Store Implementation
-// =================================================================
-
-export const useAppStore = create<AppStore>()(
-  devtools(
-    persist(
-      immer((set: any, get: any) => ({
-        ...initialState,
-
-        // User Actions
-        setUserProfile: (profile: UserProfile | null) =>
-          set((state: AppState) => {
-            state.user.profile = profile;
-          }),
-
-        setSelectedProperty: (propertyId: string | null) =>
-          set((state: AppState) => {
-            state.user.selectedProperty = propertyId;
-            // Update filters to use selected property
-            state.jobs.filters.propertyId = propertyId;
-            state.maintenance.filters.propertyId = propertyId;
-          }),
-
-        setUserProperties: (properties: Property[]) =>
-          set((state: AppState) => {
-            state.user.userProperties = properties;
-          }),
-
-        setUserLoading: (loading: boolean) =>
-          set((state: AppState) => {
-            state.user.isLoading = loading;
-          }),
-
-        setUserError: (error: string | null) =>
-          set((state: AppState) => {
-            state.user.error = error;
-          }),
-
-        // Job Actions
-        setJobs: (jobs: Job[]) =>
-          set((state: AppState) => {
-            state.jobs.items = jobs;
-          }),
-
-        addJob: (job: Job) =>
-          set((state: AppState) => {
-            state.jobs.items.push(job);
-          }),
-
-        updateJob: (id: string, updates: Partial<Job>) =>
-          set((state: AppState) => {
-            const jobIdNum = Number(id);
-            const jobIndex = state.jobs.items.findIndex(job => job.id === jobIdNum);
-            if (jobIndex !== -1) {
-              state.jobs.items[jobIndex] = { ...state.jobs.items[jobIndex], ...updates };
-            }
-            if (state.jobs.selectedJob?.id === jobIdNum) {
-              state.jobs.selectedJob = { ...state.jobs.selectedJob, ...updates };
-            }
-          }),
-
-        deleteJob: (id: string) =>
-          set((state: AppState) => {
-            const jobIdNum = Number(id);
-            state.jobs.items = state.jobs.items.filter(job => job.id !== jobIdNum);
-            if (state.jobs.selectedJob?.id === jobIdNum) {
-              state.jobs.selectedJob = null;
-            }
-          }),
-
-        setSelectedJob: (job: Job | null) =>
-          set((state: AppState) => {
-            state.jobs.selectedJob = job;
-          }),
-
-        setJobsLoading: (loading: boolean) =>
-          set((state: AppState) => {
-            state.jobs.isLoading = loading;
-          }),
-
-        setJobsError: (error: string | null) =>
-          set((state: AppState) => {
-            state.jobs.error = error;
-          }),
-
-        setJobFilters: (filters: Partial<AppState['jobs']['filters']>) =>
-          set((state: AppState) => {
-            state.jobs.filters = { ...state.jobs.filters, ...filters };
-          }),
-
-        resetJobFilters: () =>
-          set((state: AppState) => {
-            state.jobs.filters = initialState.jobs.filters;
-          }),
-
-        // Maintenance Actions
-        setMaintenanceItems: (items: PreventiveMaintenance[]) =>
-          set((state: AppState) => {
-            state.maintenance.items = items;
-          }),
-
-        addMaintenance: (item: PreventiveMaintenance) =>
-          set((state: AppState) => {
-            state.maintenance.items.push(item);
-          }),
-
-        updateMaintenance: (id: string, updates: Partial<PreventiveMaintenance>) =>
-          set((state: AppState) => {
-            const itemIdStr = String(id);
-            const itemIndex = state.maintenance.items.findIndex(item => item.pm_id === itemIdStr);
-            if (itemIndex !== -1) {
-              state.maintenance.items[itemIndex] = { ...state.maintenance.items[itemIndex], ...updates };
-            }
-            if (state.maintenance.selectedMaintenance?.pm_id === itemIdStr) {
-              state.maintenance.selectedMaintenance = { ...state.maintenance.selectedMaintenance, ...updates };
-            }
-          }),
-
-        deleteMaintenance: (id: string) =>
-          set((state: AppState) => {
-            state.maintenance.items = state.maintenance.items.filter(item => item.pm_id !== id);
-            if (state.maintenance.selectedMaintenance?.pm_id === id) {
-              state.maintenance.selectedMaintenance = null;
-            }
-          }),
-
-        setSelectedMaintenance: (item: PreventiveMaintenance | null) =>
-          set((state: AppState) => {
-            state.maintenance.selectedMaintenance = item;
-          }),
-
-        setMaintenanceStatistics: (stats: DashboardStats | null) =>
-          set((state: AppState) => {
-            state.maintenance.statistics = stats;
-          }),
-
-        setMaintenanceLoading: (loading: boolean) =>
-          set((state: AppState) => {
-            state.maintenance.isLoading = loading;
-          }),
-
-        setMaintenanceError: (error: string | null) =>
-          set((state: AppState) => {
-            state.maintenance.error = error;
-          }),
-
-        setMaintenanceFilters: (filters: Partial<AppState['maintenance']['filters']>) =>
-          set((state: AppState) => {
-            state.maintenance.filters = { ...state.maintenance.filters, ...filters };
-          }),
-
-        resetMaintenanceFilters: () =>
-          set((state: AppState) => {
-            state.maintenance.filters = initialState.maintenance.filters;
-          }),
-
-        // Common Data Actions
-        setProperties: (properties: Property[]) =>
-          set((state: AppState) => {
-            state.common.properties = properties;
-          }),
-
-        setRooms: (rooms: Room[]) =>
-          set((state: AppState) => {
-            state.common.rooms = rooms;
-          }),
-
-        setTopics: (topics: Topic[]) =>
-          set((state: AppState) => {
-            state.common.topics = topics;
-          }),
-
-        setMachines: (machines: MachineDetails[]) =>
-          set((state: AppState) => {
-            state.common.machines = machines;
-          }),
-
-        setCommonLoading: (loading: boolean) =>
-          set((state: AppState) => {
-            state.common.isLoading = loading;
-          }),
-
-        setCommonError: (error: string | null) =>
-          set((state: AppState) => {
-            state.common.error = error;
-          }),
-
-        // Utility Actions
-        clearErrors: () =>
-          set((state: AppState) => {
-            state.user.error = null;
-            state.jobs.error = null;
-            state.maintenance.error = null;
-            state.common.error = null;
-          }),
-
-        resetStore: () =>
-          set(() => initialState),
-      })),
-      {
-        name: 'app-store',
-        partialize: (state) => ({
-          user: {
-            selectedProperty: state.user.selectedProperty,
-            userProperties: state.user.userProperties,
-          },
-          jobs: {
-            filters: state.jobs.filters,
-          },
-          maintenance: {
-            filters: state.maintenance.filters,
-          },
-        }),
-      }
-    ),
-    {
-      name: 'app-store',
+  
+  // Actions
+  setUserProfile: (profile: any) => set((state) => ({ user: { ...state.user, profile } })),
+  setSelectedProperty: (propertyId: string | null) => set((state) => ({ 
+    user: { ...state.user, selectedProperty: propertyId },
+    jobs: { ...state.jobs, filters: { ...state.jobs.filters, propertyId } },
+    maintenance: { ...state.maintenance, filters: { ...state.maintenance.filters, propertyId } }
+  })),
+  setUserProperties: (properties: any[]) => set((state) => ({ user: { ...state.user, userProperties: properties } })),
+  setUserLoading: (loading: boolean) => set((state) => ({ user: { ...state.user, isLoading: loading } })),
+  setUserError: (error: string | null) => set((state) => ({ user: { ...state.user, error } })),
+  
+  setJobs: (jobs: any[]) => set((state) => ({ jobs: { ...state.jobs, items: jobs } })),
+  addJob: (job: any) => set((state) => ({ jobs: { ...state.jobs, items: [...state.jobs.items, job] } })),
+  updateJob: (id: string, updates: any) => set((state) => ({
+    jobs: {
+      ...state.jobs,
+      items: state.jobs.items.map((j: any) => j.id === Number(id) ? { ...j, ...updates } : j)
     }
-  )
-);
+  })),
+  deleteJob: (id: string) => set((state) => ({
+    jobs: {
+      ...state.jobs,
+      items: state.jobs.items.filter((j: any) => j.id !== Number(id))
+    }
+  })),
+  setSelectedJob: (job: any) => set((state) => ({ jobs: { ...state.jobs, selectedJob: job } })),
+  setJobsLoading: (loading: boolean) => set((state) => ({ jobs: { ...state.jobs, isLoading: loading } })),
+  setJobsError: (error: string | null) => set((state) => ({ jobs: { ...state.jobs, error } })),
+  setJobFilters: (filters: any) => set((state) => ({ jobs: { ...state.jobs, filters: { ...state.jobs.filters, ...filters } } })),
+  resetJobFilters: () => set((state) => ({
+    jobs: {
+      ...state.jobs,
+      filters: {
+        status: '',
+        priority: '',
+        propertyId: null,
+        search: '',
+        page: 1,
+        pageSize: 10,
+      }
+    }
+  })),
+  
+  setMaintenanceItems: (items: any[]) => set((state) => ({ maintenance: { ...state.maintenance, items } })),
+  addMaintenance: (item: any) => set((state) => ({ maintenance: { ...state.maintenance, items: [...state.maintenance.items, item] } })),
+  updateMaintenance: (id: string, updates: any) => set((state) => ({
+    maintenance: {
+      ...state.maintenance,
+      items: state.maintenance.items.map((i: any) => i.pm_id === id ? { ...i, ...updates } : i)
+    }
+  })),
+  deleteMaintenance: (id: string) => set((state) => ({
+    maintenance: {
+      ...state.maintenance,
+      items: state.maintenance.items.filter((i: any) => i.pm_id !== id)
+    }
+  })),
+  setSelectedMaintenance: (item: any) => set((state) => ({ maintenance: { ...state.maintenance, selectedMaintenance: item } })),
+  setMaintenanceStatistics: (stats: any) => set((state) => ({ maintenance: { ...state.maintenance, statistics: stats } })),
+  setMaintenanceLoading: (loading: boolean) => set((state) => ({ maintenance: { ...state.maintenance, isLoading: loading } })),
+  setMaintenanceError: (error: string | null) => set((state) => ({ maintenance: { ...state.maintenance, error } })),
+  setMaintenanceFilters: (filters: any) => set((state) => ({ maintenance: { ...state.maintenance, filters: { ...state.maintenance.filters, ...filters } } })),
+  resetMaintenanceFilters: () => set((state) => ({
+    maintenance: {
+      ...state.maintenance,
+      filters: {
+        status: '',
+        frequency: '',
+        machineId: null,
+        propertyId: null,
+        search: '',
+        page: 1,
+        pageSize: 10,
+      }
+    }
+  })),
+  
+  setProperties: (properties: any[]) => set((state) => ({ common: { ...state.common, properties } })),
+  setRooms: (rooms: any[]) => set((state) => ({ common: { ...state.common, rooms } })),
+  setTopics: (topics: any[]) => set((state) => ({ common: { ...state.common, topics } })),
+  setMachines: (machines: any[]) => set((state) => ({ common: { ...state.common, machines } })),
+  setCommonLoading: (loading: boolean) => set((state) => ({ common: { ...state.common, isLoading: loading } })),
+  setCommonError: (error: string | null) => set((state) => ({ common: { ...state.common, error } })),
+  
+  clearErrors: () => set((state) => ({
+    user: { ...state.user, error: null },
+    jobs: { ...state.jobs, error: null },
+    maintenance: { ...state.maintenance, error: null },
+    common: { ...state.common, error: null }
+  })),
+  resetStore: () => set(() => ({})),
+}));
 
-// =================================================================
-// Selector Hooks for Better Performance
-// =================================================================
-
+// Selector hooks
 export const useUserStore = () => useAppStore((state) => state.user);
 export const useJobsStore = () => useAppStore((state) => state.jobs);
 export const useMaintenanceStore = () => useAppStore((state) => state.maintenance);
 export const useCommonStore = () => useAppStore((state) => state.common);
 
-// =================================================================
-// Computed Selectors
-// =================================================================
-
+// Computed selectors
 export const useFilteredJobs = () => {
   const { items, filters } = useJobsStore();
   
-  return items.filter(job => {
+  return items.filter((job: any) => {
     if (filters.status && job.status !== filters.status) return false;
     if (filters.priority && job.priority !== filters.priority) return false;
     if (filters.propertyId && job.property_id !== filters.propertyId) return false;
@@ -440,7 +264,7 @@ export const useFilteredJobs = () => {
 export const useFilteredMaintenance = () => {
   const { items, filters } = useMaintenanceStore();
   
-  return items.filter(item => {
+  return items.filter((item: any) => {
     if (filters.status && item.status !== filters.status) return false;
     if (filters.frequency && item.frequency !== filters.frequency) return false;
     if (filters.machineId && item.machine_id !== filters.machineId) return false;
@@ -455,4 +279,4 @@ export const useFilteredMaintenance = () => {
     }
     return true;
   });
-}; 
+};

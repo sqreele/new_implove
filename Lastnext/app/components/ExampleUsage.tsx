@@ -7,15 +7,38 @@
 
 import React from 'react';
 import { useAppData } from '@/app/lib/hooks/useAppData';
-import { useFilteredJobs, useFilteredMaintenance } from '@/app/lib/store/AppStore';
+import type { Job } from '@/app/lib/types';
+import type { PreventiveMaintenance } from '@/app/lib/types/preventiveMaintenanceModels';
 
 export function ExampleUsage() {
   // Use the combined hook for all data
   const { user, jobs, maintenance, common } = useAppData();
   
-  // Use computed selectors for filtered data
-  const filteredJobs = useFilteredJobs();
-  const filteredMaintenance = useFilteredMaintenance();
+  // Implement filtering logic directly since selectors don't exist
+  const filteredJobs = jobs.jobs.filter((job: Job) => {
+    if (jobs.filters.status && job.status !== jobs.filters.status) return false;
+    if (jobs.filters.search) {
+      const searchLower = jobs.filters.search.toLowerCase();
+      return (
+        job.job_id.toLowerCase().includes(searchLower) ||
+        job.description.toLowerCase().includes(searchLower)
+      );
+    }
+    return true;
+  });
+
+  const filteredMaintenance = maintenance.maintenanceItems.filter((item: PreventiveMaintenance) => {
+    if (maintenance.filters.status && item.status !== maintenance.filters.status) return false;
+    if (maintenance.filters.search) {
+      const searchLower = maintenance.filters.search.toLowerCase();
+      return (
+        (item.pmtitle?.toLowerCase().includes(searchLower) || false) ||
+        (item.job_description?.toLowerCase().includes(searchLower) || false) ||
+        item.pm_id.toLowerCase().includes(searchLower)
+      );
+    }
+    return true;
+  });
 
   // Example: Handle property selection
   const handlePropertyChange = (propertyId: string) => {
@@ -46,7 +69,7 @@ export function ExampleUsage() {
           className="border p-2 rounded"
         >
           <option value="">Select Property</option>
-          {user.userProperties.map(property => (
+          {user.userProperties.map((property: any) => (
             <option key={property.id} value={property.property_id}>
               {property.name}
             </option>
