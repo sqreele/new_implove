@@ -4,9 +4,8 @@
  */
 
 import { useCallback, useEffect } from 'react';
-import { useAppStore, useUserStore, useJobsStore, useMaintenanceStore, useCommonStore } from '@/app/lib/store/AppStore';
+import { useAppStore, useUserStore, useMaintenanceStore, useCommonStore } from '@/app/lib/store/AppStore';
 import { 
-  jobService, 
   propertyService, 
   roomService, 
   topicService, 
@@ -16,7 +15,7 @@ import {
   AppError 
 } from '../services/AppServices';
 import { useSession } from 'next-auth/react';
-import type { Job } from '@/app/lib/types';
+import { useJobsData } from './useJobsData';
 
 // =================================================================
 // User Data Hooks
@@ -58,9 +57,6 @@ export const useUserData = () => {
 
   const updateSelectedProperty = useCallback((propertyId: string | null) => {
     setSelectedProperty(propertyId);
-    // Update filters in other stores
-    useAppStore.getState().setJobFilters({ propertyId });
-    useAppStore.getState().setMaintenanceFilters({ propertyId });
   }, [setSelectedProperty]);
 
   useEffect(() => {
@@ -94,115 +90,6 @@ export const useUserData = () => {
     fetchUserProfile,
     updateSelectedProperty,
     isAuthenticated: status === 'authenticated'
-  };
-};
-
-// =================================================================
-// Jobs Data Hooks
-// =================================================================
-
-export const useJobsData = () => {
-  const { 
-    items: jobs, 
-    selectedJob, 
-    isLoading, 
-    error, 
-    filters
-  } = useJobsStore();
-  const {
-    setJobs,
-    setSelectedJob,
-    setJobsLoading,
-    setJobsError,
-    setJobFilters,
-    resetJobFilters
-  } = useAppStore();
-  const { selectedProperty } = useUserStore();
-
-  const fetchJobs = useCallback(async () => {
-    try {
-      setJobsLoading(true);
-      setJobsError(null);
-      const jobsData = await jobService.getJobs(selectedProperty);
-      setJobs(jobsData);
-    } catch (error) {
-      const appError = error as AppError;
-      setJobsError(appError.message);
-      console.error('Failed to fetch jobs:', appError);
-    } finally {
-      setJobsLoading(false);
-    }
-  }, [selectedProperty, setJobs, setJobsLoading, setJobsError]);
-
-  const createJob = useCallback(async (jobData: FormData) => {
-    try {
-      setJobsLoading(true);
-      setJobsError(null);
-      const newJob = await jobService.createJob(jobData);
-      useAppStore.getState().addJob(newJob);
-      return newJob;
-    } catch (error) {
-      const appError = error as AppError;
-      setJobsError(appError.message);
-      console.error('Failed to create job:', appError);
-      throw appError;
-    } finally {
-      setJobsLoading(false);
-    }
-  }, [setJobsLoading, setJobsError]);
-
-  const updateJob = useCallback(async (jobId: string, updates: Partial<Job>) => {
-    try {
-      setJobsLoading(true);
-      setJobsError(null);
-      const updatedJob = await jobService.updateJob(jobId, updates);
-      useAppStore.getState().updateJob(jobId, updatedJob);
-      return updatedJob;
-    } catch (error) {
-      const appError = error as AppError;
-      setJobsError(appError.message);
-      console.error('Failed to update job:', appError);
-      throw appError;
-    } finally {
-      setJobsLoading(false);
-    }
-  }, [setJobsLoading, setJobsError]);
-
-  const deleteJob = useCallback(async (jobId: string) => {
-    try {
-      setJobsLoading(true);
-      setJobsError(null);
-      await jobService.deleteJob(jobId);
-      useAppStore.getState().deleteJob(jobId);
-    } catch (error) {
-      const appError = error as AppError;
-      setJobsError(appError.message);
-      console.error('Failed to delete job:', appError);
-      throw appError;
-    } finally {
-      setJobsLoading(false);
-    }
-  }, [setJobsLoading, setJobsError]);
-
-  useEffect(() => {
-    if (selectedProperty) {
-      fetchJobs();
-    }
-  }, [selectedProperty, fetchJobs]);
-
-  return {
-    jobs,
-    selectedJob,
-    isLoading,
-    error,
-    filters,
-    fetchJobs,
-    createJob,
-    updateJob,
-    deleteJob,
-    setSelectedJob,
-    setJobFilters,
-    resetJobFilters
   };
 };
 
@@ -464,4 +351,4 @@ export const useAppData = () => {
     maintenance: maintenanceData,
     common: commonData
   };
-}; 
+};
