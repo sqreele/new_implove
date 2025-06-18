@@ -4,9 +4,9 @@ import type {
   Property, 
   Room, 
   Topic, 
-  UserProfile,
   PaginatedResponse 
 } from '@/app/lib/types';
+import type { UserProfile } from '@/app/lib/types';
 import type { 
   PreventiveMaintenance,
   CreatePreventiveMaintenanceData,

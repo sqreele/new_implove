@@ -47,6 +47,26 @@ export type {
 // Type ทั่วไปที่ใช้ร่วมกันในหลายส่วนของโปรเจกต์ สามารถเก็บไว้ที่นี่ได้
 // -----------------------------------------------------------------------------
 
+// User Profile type
+export type UserProfile = {
+  id: string;
+  username: string;
+  email: string | null;
+  profile_image: string | null;
+  positions: string;
+  properties: Array<{
+    id: string;
+    property_id: string;
+    name: string;
+    description?: string;
+    created_at?: string;
+  }>;
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpires?: number;
+  created_at?: string;
+};
+
 // General types
 export interface ServiceResponse<T> {
   success: boolean;

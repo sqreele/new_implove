@@ -88,24 +88,6 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET} \
     DATABASE_URL=${DATABASE_URL}
 
-# Initialize shadcn/ui components with error handling
-RUN npx --yes shadcn@2.5.0 init --yes 2>/dev/null || { \
-        echo "shadcn init failed, continuing without it..."; \
-        true; \
-    }
-
-RUN npx --yes shadcn@2.5.0 add \
-    accordion alert alert-dialog avatar badge breadcrumb button \
-    calendar card carousel checkbox collapsible command context-menu \
-    data-table date-picker dialog drawer dropdown-menu form hover-card \
-    input input-otp label menubar navigation-menu pagination popover \
-    progress radio-group resizable scroll-area select separator sheet \
-    skeleton slider sonner switch table tabs textarea toast toggle \
-    toggle-group tooltip --yes 2>/dev/null || { \
-        echo "Some shadcn components failed to install, continuing..."; \
-        true; \
-    }
-
 # Generate Prisma client (safe without database connection)
 RUN if [ -f prisma/schema.prisma ]; then \
         npx prisma generate; \
@@ -120,19 +102,7 @@ RUN npm run build
 RUN echo "=== BUILD OUTPUT DEBUG ===" && \
     echo "Contents of /app/.next:" && \
     ls -la /app/.next/ && \
-    echo "Checking for standalone build:" && \
-    if [ -d "/app/.next/standalone" ]; then \
-        echo "✅ Standalone build found" && \
-        ls -la /app/.next/standalone/; \
-    else \
-        echo "❌ No standalone build found"; \
-    fi && \
     echo "=== END DEBUG ==="
-
-# Clean up dev dependencies and build artifacts to reduce image size
-RUN npm ci --omit=dev --legacy-peer-deps && \
-    npm cache clean --force && \
-    rm -rf /tmp/.npm /root/.npm
 
 # ================================
 # Runner stage - Production runtime
@@ -150,10 +120,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/next.config.mjs ./next.config.mjs
 
 # Create necessary directories with proper permissions
-RUN mkdir -p /app/.next/cache && \
-    mkdir -p ./prisma && \
+RUN mkdir -p ./.next/cache && \
     chown -R nextjs:nodejs /app
 
 # Add health check
@@ -166,5 +136,5 @@ USER nextjs
 # Expose port
 EXPOSE 3000
 
-# Start the application directly with Next.js
-CMD ["npx", "next", "start"]
+# Start the application
+CMD ["npm", "start"]
