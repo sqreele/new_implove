@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePreventiveMaintenance, PreventiveMaintenanceCompleteRequest } from '@/app/lib/PreventiveContext';
-import { MaintenanceImage } from '@/app/lib/preventiveMaintenanceModels';
+import { MaintenanceImage } from '@/app/lib/types/preventiveMaintenanceModels';
 import React from 'react';
 import { 
   ArrowLeft, 

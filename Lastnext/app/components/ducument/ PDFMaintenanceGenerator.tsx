@@ -26,7 +26,7 @@ import {
   getMachinesString,
   getLocationString,
   itemMatchesMachine
-} from '@/app/lib/preventiveMaintenanceModels';
+} from '@/app/lib/types/preventiveMaintenanceModels';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';

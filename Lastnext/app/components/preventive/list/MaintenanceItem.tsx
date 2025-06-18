@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
+import { PreventiveMaintenance } from '@/app/lib/types/preventiveMaintenanceModels';
 import { Eye, Edit, Trash2, MoreVertical, CheckCircle, AlertCircle, Clock, Calendar, Wrench, Clipboard } from 'lucide-react';
 
 interface MaintenanceItemProps {

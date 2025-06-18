@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
-import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
+import { PreventiveMaintenance } from '@/app/lib/types/preventiveMaintenanceModels';
 
 // Define the sort field type
 type SortField = 'date' | 'status' | 'frequency' | 'machine';

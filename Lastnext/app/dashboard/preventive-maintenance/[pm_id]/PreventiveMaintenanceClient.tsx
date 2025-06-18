@@ -10,7 +10,7 @@ import {
   PreventiveMaintenance, 
   getImageUrl,
   determinePMStatus 
-} from '@/app/lib/preventiveMaintenanceModels';
+} from '@/app/lib/types/preventiveMaintenanceModels';
 import { 
   AlertCircle, 
   Calendar, 

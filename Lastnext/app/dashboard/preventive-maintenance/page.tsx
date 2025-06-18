@@ -4,10 +4,10 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext';
 import { useFilters } from '@/app/lib/FilterContext';
-import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
 
 // Import types
 import { FilterState, MachineOption, Stats } from '@/app/lib/hooks/filterTypes';
+import { MaintenanceStatus } from '@/app/types/preventive-maintenance';
 
 // Import components
 import MobileHeader from '@/app/components/preventive/list/MobileHeader';
@@ -51,7 +51,8 @@ export default function PreventiveMaintenanceListPage() {
     setFilterParams,
     clearError,
     debugMachineFilter,
-    testMachineFiltering
+    testMachineFiltering,
+    updateMaintenance
   } = usePreventiveMaintenance();
 
   // UI state
@@ -278,6 +279,32 @@ export default function PreventiveMaintenanceListPage() {
     ].filter(value => value !== '').length;
   }, [currentFilters]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <h2 className="text-red-800 font-medium">Error</h2>
+          <p className="text-red-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile Header */}
@@ -364,6 +391,11 @@ export default function PreventiveMaintenanceListPage() {
             getStatusInfo={getStatusInfo}
             getFrequencyText={getFrequencyText}
             currentFilters={currentFilters}
+            onEdit={(id) => router.push(`/dashboard/preventive-maintenance/${id}/edit`)}
+            onView={(id) => router.push(`/dashboard/preventive-maintenance/${id}`)}
+            onStatusChange={(id, completed) => {
+              updateMaintenance(id, { completed_date: completed ? new Date().toISOString() : undefined });
+            }}
           />
         )}
 

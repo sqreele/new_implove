@@ -2,7 +2,7 @@
 
 import apiClient from './api-client';
 import { handleApiError } from './api-client';
-import type { ServiceResponse } from './preventiveMaintenanceModels';
+import type { ServiceResponse } from './types/preventiveMaintenanceModels';
 
 export interface Machine {
   machine_id: string;

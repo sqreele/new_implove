@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext';
-import { PreventiveMaintenance, FrequencyType } from '@/app/lib/preventiveMaintenanceModels';
+import { PreventiveMaintenance, FrequencyType } from '@/app/lib/types/preventiveMaintenanceModels';
 import { UpdatePreventiveMaintenanceData } from '@/app/lib/PreventiveMaintenanceService';
 import { 
   Calendar, 

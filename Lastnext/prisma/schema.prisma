@@ -7,59 +7,205 @@ datasource db {
   url      = env("DATABASE_URL")  // Ensure this points to your PostgreSQL database in .env
 }
 
-model User {
-  id         String     @id @default(uuid())  // Unique identifier
-  username   String     @unique
-  email      String?    @unique
-  profile_image String?
-  positions  String     @default("User")
-  created_at DateTime   @default(now())
-  accessToken   String?
-  refreshToken  String?
-  sessionToken  String?
-  accounts   Account[]
-  sessions   Session[]
-  properties UserProperty[] // New relation table for many-to-many properties
+// Base model with common fields
+model BaseEntity {
+  id        String   @id @default(uuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([created_at])
+  @@index([updated_at])
 }
 
-model Property {
-  id          String     @id @default(uuid())  
-  name        String
-  description String?
-  created_at  DateTime   @default(now())
-  users       UserProperty[]
+// Job related models
+model Job extends BaseEntity {
+  job_id          String   @unique
+  title           String
+  description     String
+  status          JobStatus
+  priority        JobPriority
+  type            JobType
+  assigned_to     String?
+  created_by      String
+  property_id     String
+  property_name   String?
+  room_id         String?
+  room_name       String?
+  machine_id      String?
+  scheduled_date  DateTime
+  completed_date  DateTime?
+  estimated_hours Float?
+  actual_hours    Float?
+  cost            Float?
+  notes           String?
+  
+  // Relations
+  attachments     JobAttachment[]
+  checklist       JobChecklistItem[]
+  history         JobHistory[]
+  property        Property    @relation(fields: [property_id], references: [id])
+  room            Room?       @relation(fields: [room_id], references: [id])
+  machine         Machine?    @relation(fields: [machine_id], references: [id])
+  assigned_user   User?       @relation("AssignedJobs", fields: [assigned_to], references: [id])
+  creator         User        @relation("CreatedJobs", fields: [created_by], references: [id])
+
+  @@index([status])
+  @@index([priority])
+  @@index([type])
+  @@index([assigned_to])
+  @@index([property_id])
+  @@index([room_id])
+  @@index([machine_id])
+  @@index([scheduled_date])
+  @@index([completed_date])
 }
 
-model UserProperty {  // Join table for User <-> Property many-to-many relation
-  userId     String
-  propertyId String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+model JobAttachment extends BaseEntity {
+  job_id      String
+  file_name   String
+  file_url    String
+  file_type   String
+  file_size   Int
+  uploaded_by String
+  
+  // Relations
+  job         Job        @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  uploader    User       @relation(fields: [uploaded_by], references: [id])
 
-  @@id([userId, propertyId])  // Composite primary key
+  @@index([job_id])
+  @@index([uploaded_by])
 }
 
-model Account {
-  id                 String   @id @default(uuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@unique([provider, providerAccountId])
+model JobChecklistItem extends BaseEntity {
+  job_id         String
+  title          String
+  description    String?
+  is_completed   Boolean   @default(false)
+  completed_at   DateTime?
+  completed_by   String?
+  order          Int
+  
+  // Relations
+  job            Job       @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  completer      User?     @relation(fields: [completed_by], references: [id])
+
+  @@index([job_id])
+  @@index([is_completed])
+  @@index([completed_by])
 }
 
-model Session {
-  id           String   @id @default(uuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model JobHistory extends BaseEntity {
+  job_id          String
+  action          String
+  description     String
+  performed_by    String
+  performed_at    DateTime
+  previous_status JobStatus?
+  new_status      JobStatus?
+  
+  // Relations
+  job             Job       @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  performer       User      @relation(fields: [performed_by], references: [id])
+
+  @@index([job_id])
+  @@index([performed_by])
+  @@index([performed_at])
+}
+
+// Enums
+enum JobStatus {
+  pending
+  in_progress
+  completed
+  cancelled
+  on_hold
+}
+
+enum JobPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum JobType {
+  maintenance
+  repair
+  inspection
+  installation
+  other
+}
+
+// Related models
+model User extends BaseEntity {
+  email           String    @unique
+  name            String
+  role            UserRole
+  is_active       Boolean   @default(true)
+  
+  // Relations
+  assigned_jobs   Job[]     @relation("AssignedJobs")
+  created_jobs    Job[]     @relation("CreatedJobs")
+  uploaded_files  JobAttachment[]
+  completed_items JobChecklistItem[]
+  job_history     JobHistory[]
+
+  @@index([email])
+  @@index([role])
+  @@index([is_active])
+}
+
+model Property extends BaseEntity {
+  name            String
+  address         String?
+  description     String?
+  
+  // Relations
+  jobs            Job[]
+  rooms           Room[]
+  machines        Machine[]
+
+  @@index([name])
+}
+
+model Room extends BaseEntity {
+  name            String
+  property_id     String
+  description     String?
+  
+  // Relations
+  property        Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  jobs            Job[]
+  machines        Machine[]
+
+  @@index([property_id])
+  @@index([name])
+}
+
+model Machine extends BaseEntity {
+  name            String
+  machine_id      String    @unique
+  status          String?
+  description     String?
+  property_id     String
+  room_id         String?
+  is_active       Boolean   @default(true)
+  procedure       String?
+  
+  // Relations
+  property        Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  room            Room?     @relation(fields: [room_id], references: [id])
+  jobs            Job[]
+
+  @@index([property_id])
+  @@index([room_id])
+  @@index([machine_id])
+  @@index([is_active])
+}
+
+enum UserRole {
+  admin
+  manager
+  technician
+  client
 }

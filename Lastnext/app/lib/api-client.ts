@@ -35,9 +35,10 @@ export class ApiError extends Error {
 }
 
 // Create API client instance with increased timeout and debugging
-const apiClient: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ||
-    (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "https://pmcs.site"),
+const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+export const apiClient = axios.create({
+  baseURL,
   timeout: 30000, // Increased to 30 seconds
   headers: {
     "Content-Type": "application/json",
@@ -433,7 +434,6 @@ export async function uploadFile<T>(url: string, formData: FormData): Promise<T>
     throw handleApiError(error);
   }
 }
-// Add this to your api-client.ts file
 
 /**
  * Helper function to upload multipart form data with automatic auth handling

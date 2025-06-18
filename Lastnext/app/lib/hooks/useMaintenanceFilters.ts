@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
+import { PreventiveMaintenance } from '@/app/lib/types/preventiveMaintenanceModels';
 
 // Helper function to check if item matches status filter
 function matchesStatus(item: PreventiveMaintenance, statusFilter: string): boolean {

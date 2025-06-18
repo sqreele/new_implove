@@ -1,84 +1,172 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { PreventiveMaintenanceProvider } from '@/app/lib/PreventiveContext';
-import PreventiveMaintenanceForm from '@/app/components/preventive/PreventiveMaintenanceForm';
-import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
+import React from 'react';
+import { usePreventiveMaintenance } from '@/app/contexts/preventive-maintenance';
 
-// Create page content component that doesn't require context
-function CreatePageContent() {
-  const router = useRouter();
-  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
-  const [submittedData, setSubmittedData] = useState<any>(null);
-
-  // Handle successful form submission
-  const handleSuccess = (data: PreventiveMaintenance) => {
-    // Log the full data structure for debugging
-    console.log('Form submitted successfully with data:', JSON.stringify(data));
-    
-    // Store the data in state for possible use in the UI
-    setSubmittedData(data);
-    setIsSubmitted(true);
-    
-    // Redirect after a short delay to show success message
-    setTimeout(() => {
-      try {
-        // Check if pm_id exists, with multiple safety checks
-        if (data && typeof data === 'object' && 'pm_id' in data && data.pm_id) {
-          const pmId = data.pm_id;
-          console.log(`Redirecting to PM details page: ${pmId}`);
-          router.push(`/dashboard/preventive-maintenance/${pmId}`);
-        } else {
-          console.warn('PM ID is undefined or invalid, redirecting to dashboard instead');
-          router.push('/dashboard/preventive-maintenance/dashboard');
-        }
-      } catch (error) {
-        console.error('Error during redirect:', error);
-        // Fallback to dashboard on any error
-        router.push('/dashboard/preventive-maintenance/dashboard');
-      }
-    }, 1500);
-  };
-
-  return (
-    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Create Preventive Maintenance</h1>
-        <Link 
-          href="/dashboard/preventive-maintenance" 
-          className="bg-gray-100 py-2 px-4 rounded-md text-gray-700 hover:bg-gray-200"
-        >
-          Back to List
-        </Link>
-      </div>
-
-      {isSubmitted ? (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-          <p>Preventive maintenance created successfully! Redirecting...</p>
-          {submittedData && submittedData.pm_id && (
-            <p className="mt-2 text-sm">
-              Record ID: {submittedData.pm_id}
-            </p>
-          )}
-        </div>
-      ) : (
-        <PreventiveMaintenanceForm
-          onSuccessAction={handleSuccess}
-        />
-      )}
-    </div>
-  );
-}
-
-// Main page component that provides the context
 export default function CreatePreventiveMaintenancePage() {
+  const { machines, topics } = usePreventiveMaintenance();
+
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <PreventiveMaintenanceProvider>
-        <CreatePageContent />
-      </PreventiveMaintenanceProvider>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <h1 className="text-3xl font-bold text-gray-900">Create Preventive Maintenance</h1>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="bg-white shadow sm:rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <form className="space-y-6">
+              {/* Title */}
+              <div>
+                <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                  Title
+                </label>
+                <div className="mt-1">
+                  <input
+                    type="text"
+                    name="title"
+                    id="title"
+                    className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    placeholder="Enter maintenance title"
+                  />
+                </div>
+              </div>
+
+              {/* Machine Selection */}
+              <div>
+                <label htmlFor="machine" className="block text-sm font-medium text-gray-700">
+                  Machine
+                </label>
+                <div className="mt-1">
+                  <select
+                    id="machine"
+                    name="machine"
+                    className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  >
+                    <option value="">Select a machine</option>
+                    {machines.map((machine) => (
+                      <option key={machine.machine_id} value={machine.machine_id}>
+                        {machine.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Scheduled Date */}
+              <div>
+                <label htmlFor="scheduled_date" className="block text-sm font-medium text-gray-700">
+                  Scheduled Date
+                </label>
+                <div className="mt-1">
+                  <input
+                    type="date"
+                    name="scheduled_date"
+                    id="scheduled_date"
+                    className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+
+              {/* Frequency */}
+              <div>
+                <label htmlFor="frequency" className="block text-sm font-medium text-gray-700">
+                  Frequency
+                </label>
+                <div className="mt-1">
+                  <select
+                    id="frequency"
+                    name="frequency"
+                    className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Biweekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="biannually">Biannually</option>
+                    <option value="annually">Annually</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Topics */}
+              <div>
+                <label htmlFor="topics" className="block text-sm font-medium text-gray-700">
+                  Topics
+                </label>
+                <div className="mt-1">
+                  <select
+                    id="topics"
+                    name="topics"
+                    multiple
+                    className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  >
+                    {topics.map((topic) => (
+                      <option key={topic.id} value={topic.id}>
+                        {topic.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+                  Notes
+                </label>
+                <div className="mt-1">
+                  <textarea
+                    id="notes"
+                    name="notes"
+                    rows={3}
+                    className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    placeholder="Enter maintenance notes"
+                  />
+                </div>
+              </div>
+
+              {/* Before Image */}
+              <div>
+                <label htmlFor="before_image" className="block text-sm font-medium text-gray-700">
+                  Before Image
+                </label>
+                <div className="mt-1">
+                  <input
+                    type="file"
+                    name="before_image"
+                    id="before_image"
+                    accept="image/*"
+                    className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Create Maintenance
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

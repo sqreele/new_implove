@@ -1,4 +1,4 @@
-import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
+import { PreventiveMaintenance } from '@/app/lib/types/preventiveMaintenanceModels';
 
 export function formatDate(dateString: string): string {
   if (!dateString) return 'N/A';

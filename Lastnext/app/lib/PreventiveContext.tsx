@@ -8,7 +8,7 @@ import {
   FrequencyType, 
   ServiceResponse,
   itemMatchesMachine // ✅ Import the helper function
-} from '@/app/lib/preventiveMaintenanceModels';
+} from '@/app/lib/types/preventiveMaintenanceModels';
 import { 
   preventiveMaintenanceService,
   CreatePreventiveMaintenanceData, 

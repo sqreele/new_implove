@@ -21,6 +21,11 @@ model User {
   sessions      Session[]
   properties    Property[] @relation("UserProperties") // Direct relation to Property
   userProperties UserProperty[] // Keep join table for explicit control
+  assigned_jobs    Job[]            @relation("AssignedJobs")
+  created_jobs     Job[]            @relation("CreatedJobs")
+  job_attachments  JobAttachment[]
+  checklist_items  JobChecklistItem[] @relation("CompletedChecklistItems")
+  job_history      JobHistory[]
 }
 
 model Property {
@@ -30,6 +35,7 @@ model Property {
   created_at    DateTime   @default(now())
   users         User[]     @relation("UserProperties") // Direct relation to User
   userProperties UserProperty[]
+  jobs            Job[]
 }
 
 model UserProperty {
@@ -64,4 +70,76 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Job {
+  id              String    @id @default(uuid())
+  job_id          String    @unique
+  title           String
+  description     String
+  status          String    // 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'on_hold'
+  priority        String    // 'low' | 'medium' | 'high' | 'urgent'
+  type            String    // 'maintenance' | 'repair' | 'inspection' | 'installation' | 'other'
+  assigned_to     String?   // Foreign key to User
+  created_by      String    // Foreign key to User
+  property_id     String    // Foreign key to Property
+  property_name   String?
+  room_id         String?
+  room_name       String?
+  machine_id      String?
+  scheduled_date  DateTime
+  completed_date  DateTime?
+  estimated_hours Float?
+  actual_hours    Float?
+  cost            Float?
+  notes           String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  // Relations
+  assigned_user   User?     @relation("AssignedJobs", fields: [assigned_to], references: [id])
+  creator         User      @relation("CreatedJobs", fields: [created_by], references: [id])
+  property        Property  @relation(fields: [property_id], references: [id])
+  attachments     JobAttachment[]
+  checklist       JobChecklistItem[]
+  history         JobHistory[]
+}
+
+model JobAttachment {
+  id          String   @id @default(uuid())
+  job_id      String
+  file_name   String
+  file_url    String
+  file_type   String
+  file_size   Int
+  uploaded_by String   // Foreign key to User
+  uploaded_at DateTime @default(now())
+  job         Job      @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [uploaded_by], references: [id])
+}
+
+model JobChecklistItem {
+  id            String    @id @default(uuid())
+  job_id        String
+  title         String
+  description   String?
+  is_completed  Boolean   @default(false)
+  completed_at  DateTime?
+  completed_by  String?   // Foreign key to User
+  order         Int
+  job           Job       @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  completed_user User?    @relation(fields: [completed_by], references: [id])
+}
+
+model JobHistory {
+  id              String    @id @default(uuid())
+  job_id          String
+  action          String
+  description     String
+  performed_by    String    // Foreign key to User
+  performed_at    DateTime  @default(now())
+  previous_status String?
+  new_status      String?
+  job             Job       @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [performed_by], references: [id])
 }

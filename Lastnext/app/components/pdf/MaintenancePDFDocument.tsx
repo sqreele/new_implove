@@ -16,7 +16,7 @@ import {
   determinePMStatus,
   getMachinesString,    // ✅ Import from models
   getLocationString     // ✅ Import from models
-} from '@/app/lib/preventiveMaintenanceModels';
+} from '@/app/lib/types/preventiveMaintenanceModels';
 
 // ✅ Fixed interface for images
 interface MaintenanceImage {

@@ -197,10 +197,6 @@ function MobileHeader() {
       <div className="flex items-center px-4 py-2 border-t border-gray-100">
         <HeaderPropertyList />
       </div>
-      
-      <div className="px-4 py-2 border-t border-gray-100 overflow-x-auto scrollbar-none">
-        <MobileBreadcrumb />
-      </div>
     </header>
   );
 }
@@ -243,70 +239,63 @@ function DesktopHeader({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
 }
 
 function MobileNav() {
+  const [isOpen, setIsOpen] = React.useState(false);
   const pathname = usePathname();
-  const [open, setOpen] = React.useState(false);
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="h-9 w-9">
-          <Menu className="h-5 w-5 text-gray-600" />
-          <span className="sr-only">Menu</span>
+          <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent 
-        side="left" 
-        className="w-[280px] p-0 border-r flex flex-col bg-white"
-      >
-        <div className="p-4 border-b border-gray-200">
-          <Link href="/dashboard" className="flex items-center gap-2" onClick={() => setOpen(false)}>
-            <Package2 className="h-5 w-5 text-blue-600" />
-            <span className="font-semibold text-gray-800">PMCS Admin</span>
-          </Link>
-        </div>
-        
-        <div className="p-4 border-b bg-gray-50 border-gray-200">
-          <div className="touch-manipulation">
-            <User />
+      <SheetContent side="left" className="w-[280px] p-0">
+        <div className="flex flex-col h-full">
+          <div className="p-4 border-b border-gray-200">
+            <Link href="/dashboard" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
+              <Package2 className="h-6 w-6 text-blue-600" />
+              <span className="font-semibold text-lg text-gray-800">PMCS</span>
+            </Link>
           </div>
-        </div>
-        
-        <div className="flex-1 overflow-auto py-2">
-          <nav className="grid gap-1 px-2">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition-all duration-200 ease-in-out',
-                    isActive
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  )}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-        
-        <div className="mt-auto p-4 border-t border-gray-200">
-          <Button 
-            variant="outline" 
-            className="w-full justify-start gap-2 text-sm h-10 bg-white text-red-500 border-gray-300 hover:bg-red-50" 
-            onClick={() => {
-              setOpen(false);
-              signOut({ callbackUrl: '/auth/signin' });
-            }}
-          >
-            <LogOut className="h-4 w-4" />
-            Logout
-          </Button>
+          
+          <div className="flex-1 overflow-auto py-4">
+            <nav className="grid gap-1 px-2">
+              {navItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200 ease-in-out',
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    )}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="p-4 border-t border-gray-200">
+            <User />
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-2 text-sm h-10 bg-white text-red-500 border-gray-300 hover:bg-red-50 mt-4"
+              onClick={() => {
+                setIsOpen(false);
+                signOut({ callbackUrl: '/auth/signin' });
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
+          </div>
         </div>
       </SheetContent>
     </Sheet>
@@ -352,70 +341,49 @@ function SearchInput() {
 }
 
 function MobileSearch() {
-  const [isOpen, setIsOpen] = React.useState(false);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  
+
   function searchAction(formData: FormData) {
     const value = formData.get('q');
-    
-    // Check if value is a string before using trim
     if (!value || (typeof value === 'string' && value.trim() === '')) return;
-    
-    // Make sure we're passing a string
     const searchValue = typeof value === 'string' ? value : String(value);
     const params = new URLSearchParams({ q: searchValue });
     
     startTransition(() => {
       router.push(`/dashboard/search?${params.toString()}`);
-      setIsOpen(false);
     });
   }
-  
+
   return (
-    <>
-      {!isOpen ? (
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-9 w-9" 
-          onClick={() => setIsOpen(true)}
-        >
-          <Search className="h-5 w-5 text-gray-600" />
-          <span className="sr-only">Search</span>
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-9 w-9">
+          <Search className="h-5 w-5" />
         </Button>
-      ) : (
-        <div className="fixed inset-0 z-50 p-4 flex flex-col bg-white/95">
-          <div className="flex items-center gap-2 mb-4">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-9 w-9" 
-              onClick={() => setIsOpen(false)}
-            >
-              <PanelLeft className="h-5 w-5 text-gray-600" />
-            </Button>
-            <span className="font-medium text-gray-800">Search</span>
-          </div>
-          
-          <form action={searchAction} className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+      </SheetTrigger>
+      <SheetContent side="top" className="h-[200px] p-4">
+        <form action={searchAction} className="flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <Search className="h-5 w-5 text-gray-400" />
             <Input
-              name="q"
               type="search"
-              placeholder="Search jobs, properties..."
-              autoFocus
-              className="w-full pl-9 h-10 text-sm rounded-full bg-gray-100 border-none focus:ring-2 focus:ring-blue-500"
+              name="q"
+              placeholder="Search jobs, rooms, or maintenance..."
+              className="flex-1"
             />
-            {isPending && (
-              <div className="absolute right-3 top-3">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
-              </div>
-            )}
-          </form>
-        </div>
-      )}
-    </>
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" className="flex-1">
+              Search
+            </Button>
+            <Button type="button" variant="outline" className="flex-1">
+              Advanced
+            </Button>
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }
 

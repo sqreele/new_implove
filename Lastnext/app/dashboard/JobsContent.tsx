@@ -3,8 +3,9 @@
 import { useState, useMemo } from "react";
 import { useProperty } from "@/app/lib/PropertyContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
-import JobList from "@/app/components/jobs/jobList";
+import JobList from "@/app/components/jobs/JobList";
 import { Job, Property, TabValue } from "@/app/lib/types";
+import { JobStatus } from "@/app/types/jobs";
 import {
   Inbox, Clock, PlayCircle, CheckCircle2, XCircle,
   AlertTriangle, Filter, ChevronDown, Wrench,
@@ -85,7 +86,7 @@ export default function JobsContent({ jobs, properties }: JobsContentProps) {
   };
 
   return (
-    <div className="w-full p-4 bg-white text-gray-800">
+    <div className="w-full p-2 sm:p-4 bg-white text-gray-800">
       <Tabs
         defaultValue="all"
         className="w-full"
@@ -125,23 +126,31 @@ export default function JobsContent({ jobs, properties }: JobsContentProps) {
                   variant="outline"
                   className="w-full h-12 flex items-center justify-between gap-2 text-sm font-medium text-gray-800 border-gray-300 bg-white hover:bg-gray-100"
                 >
-                  <Filter className="w-5 h-5 text-gray-600" />
-                  <span className="truncate">
-                    {tabConfig.find((tab) => tab.value === currentTab)?.label || "All Jobs"}
-                  </span>
-                  <ChevronDown className="w-5 h-5 text-gray-600" />
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-5 h-5 text-gray-600" />
+                    <span className="truncate">
+                      {tabConfig.find((tab) => tab.value === currentTab)?.label || "All Jobs"}
+                    </span>
+                  </div>
+                  <ChevronDown className={cn(
+                    "w-5 h-5 text-gray-600 transition-transform",
+                    isDropdownOpen && "transform rotate-180"
+                  )} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent 
                 align="start" 
-                className="w-full min-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-md shadow-lg p-1 max-h-80 overflow-y-auto"
+                className="w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-md shadow-lg p-1 max-h-[80vh] overflow-y-auto"
                 sideOffset={4}
               >
                 {tabConfig.map(({ value, label, icon: Icon }) => (
                   <DropdownMenuItem
                     key={value}
                     onClick={() => handleTabChange(value)}
-                    className="flex items-center gap-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 hover:text-gray-900 cursor-pointer rounded-sm"
+                    className={cn(
+                      "flex items-center gap-2 py-3 px-4 text-sm text-gray-800 hover:bg-gray-100 hover:text-gray-900 cursor-pointer rounded-sm",
+                      currentTab === value && "bg-gray-50"
+                    )}
                   >
                     <Icon className="w-5 h-5 flex-shrink-0" />
                     <span className="truncate">{label}</span>
@@ -155,9 +164,10 @@ export default function JobsContent({ jobs, properties }: JobsContentProps) {
         {tabConfig.map(({ value }) => (
           <TabsContent key={value} value={value} className="mt-0">
             <JobList 
-              jobs={sortedJobs}
-              filter={value as TabValue} 
-              properties={properties}
+              filters={{
+                status: value === 'all' ? undefined : value as JobStatus,
+                property_id: selectedProperty || undefined
+              }}
             />
           </TabsContent>
         ))}

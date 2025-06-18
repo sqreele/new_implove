@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePreventiveMaintenance } from '@/app/lib/PreventiveContext'; // Fixed import path
-import { PreventiveMaintenance } from '@/app/lib/preventiveMaintenanceModels';
+import { PreventiveMaintenance } from '@/app/lib/types/preventiveMaintenanceModels';
 import { preventiveMaintenanceService } from '@/app/lib/PreventiveMaintenanceService';
 
 // Updated interface to match Django API response
